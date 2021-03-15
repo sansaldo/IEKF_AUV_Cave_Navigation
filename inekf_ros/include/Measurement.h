@@ -56,9 +56,11 @@ class ImuMeasurement : public Measurement {
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
         ImuMeasurement(const sensor_msgs::Imu::ConstPtr& msg);
         Eigen::VectorXd getData();
+        Eigen::Matrix3d getRotation();
 
     private: 
         Eigen::Matrix<double,6,1> data_;
+        Eigen::Matrix3d R_;
 };
 
 
@@ -66,7 +68,7 @@ class LandmarkMeasurement : public Measurement {
 
     public:
         EIGEN_MAKE_ALIGNED_OPERATOR_NEW
-        LandmarkMeasurement(const inekf_msgs::LandmarkArray::ConstPtr& msg, const tf::StampedTransform& transform);
+        LandmarkMeasurement(const inekf_msgs::LandmarkArray::ConstPtr& msg, const tf::StampedTransform& transform, const Eigen::Matrix3d& covariance);
         inekf::vectorLandmarks getData();
 
     private:

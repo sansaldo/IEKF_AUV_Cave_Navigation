@@ -51,6 +51,11 @@ int main(int argc, char **argv) {
     uint32_t seq = 0;
     t_last = 0;
 
+    // int frame_count = 0;
+    // const int num_frames_kept = 10; 
+    // int id_offset = 0;
+    // const int max_landmarks = 10;
+
     // Loop through data file and read in measurements line by line
     while (getline(infile, line)){
         vector<string> measurement;
@@ -65,8 +70,8 @@ int main(int argc, char **argv) {
             msg.header.seq = seq;
             msg.header.stamp = ros::Time(t);
             msg.header.frame_id = "/imu"; 
-            msg.orientation.w = 1;
-            msg.orientation.x = 0;
+            msg.orientation.w = 0;
+            msg.orientation.x = 1;
             msg.orientation.y = 0;
             msg.orientation.z = 0;
             msg.angular_velocity.x = stod(measurement[2]);
@@ -87,8 +92,8 @@ int main(int argc, char **argv) {
             msg.header.stamp = ros::Time(t);
             msg.header.frame_id = "/imu"; 
             for (int i=2; i<measurement.size(); i+=4) {
-                inekf_msgs::Landmark landmark;
-                landmark.id = stoi(measurement[i]);
+                inekf_msgs::VectorWithId landmark;
+                landmark.id = stoi(measurement[i]); //+ id_offset;
                 landmark.position.x = stod(measurement[i+1]);
                 landmark.position.y = stod(measurement[i+2]);
                 landmark.position.z = stod(measurement[i+3]);
@@ -96,6 +101,10 @@ int main(int argc, char **argv) {
             }
             ros::Duration(t-t_last).sleep();
             landmark_pub.publish(msg);
+            // frame_count++;
+            // if (frame_count%num_frames_kept==0) {
+            //     id_offset+=max_landmarks;
+            // }
         }
         else if (measurement[0].compare("CONTACT")==0){
             ROS_INFO("Received CONTACT Measurement");

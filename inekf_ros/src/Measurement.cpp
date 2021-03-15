@@ -33,12 +33,15 @@ ImuMeasurement::ImuMeasurement(const sensor_msgs::Imu::ConstPtr& msg) {
              msg->linear_acceleration.x, 
              msg->linear_acceleration.y, 
              msg->linear_acceleration.z;
+    Eigen::Quaternion<double> q(msg->orientation.w,msg->orientation.x,msg->orientation.y,msg->orientation.z);
+    R_ = q.toRotationMatrix();
     type_ = IMU;
 }
 Eigen::VectorXd ImuMeasurement::getData() { return data_; }
+Eigen::Matrix3d ImuMeasurement::getRotation() { return R_; }
 
 // Construct Landmark measurement
-LandmarkMeasurement::LandmarkMeasurement(const inekf_msgs::LandmarkArray::ConstPtr& msg, const tf::StampedTransform& transform){
+LandmarkMeasurement::LandmarkMeasurement(const inekf_msgs::LandmarkArray::ConstPtr& msg, const tf::StampedTransform& transform, const Eigen::Matrix3d& covariance){
     t_ = msg->header.stamp.toSec();
     type_ = LANDMARK;
     for (auto it=msg->landmarks.begin(); it!=msg->landmarks.end(); ++it) {
@@ -46,7 +49,7 @@ LandmarkMeasurement::LandmarkMeasurement(const inekf_msgs::LandmarkArray::ConstP
         tf::Vector3 p_bl = transform*p_cl; // Transform measurement from camera frame to imu frame
         Eigen::Vector3d position;
         position << p_bl.getX(), p_bl.getY(), p_bl.getZ();
-        data_.push_back(Landmark(it->id, position)); 
+        data_.push_back(Landmark(it->id, position, covariance)); 
     }
 }
 vectorLandmarks LandmarkMeasurement::getData() { return data_; }; 
@@ -74,7 +77,7 @@ KinematicMeasurement::KinematicMeasurement(const inekf_msgs::KinematicsArray::Co
         pose(0,3) = it->pose.pose.position.x;
         pose(1,3) = it->pose.pose.position.y;
         pose(2,3) = it->pose.pose.position.z;
-        Eigen::Matrix<double,6,6> covariance;
+        Eigen::Matrix<double,6,6> covariance; // Assumed orientation first, the position
         for (int i=0; i<6; ++i) {
             for (int j=0; j<6; ++j) {
                 covariance(i,j) = it->pose.covariance[6*i+j]; // Assume row-major

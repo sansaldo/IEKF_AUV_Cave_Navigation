@@ -12,7 +12,6 @@
  **/
 
 #include "ros/ros.h"
-#include "inekf_msgs/Landmark.h"
 #include "inekf_msgs/LandmarkArray.h"
 #include <random>
 
@@ -51,7 +50,7 @@ int main(int argc, char **argv) {
         msg.header.stamp = ros::Time::now();
         msg.header.frame_id = "/imu"; 
 
-        inekf_msgs::Landmark landmark;
+        inekf_msgs::VectorWithId landmark;
         landmark.id = 0;
         landmark.position.x = 1 + landmark_noise(generator);
         landmark.position.y = 1 + landmark_noise(generator);
