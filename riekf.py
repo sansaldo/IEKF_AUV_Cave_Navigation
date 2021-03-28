@@ -28,10 +28,14 @@ class Right_IEKF:
         :param x: Vector
         :return: R in skew form (NOT R_transpose)
         """
-        # vector to skew R^3 -> so(3)
-        matrix = np.array([[0, -x[2], x[1]],
-                           [x[2], 0, -x[0]],
-                           [-x[1], x[0], 0]], dtype=float)
+        # vector to skew R^9 -> se(3)+vel
+        # x = [ tx, ty, tz, vx, vy, vz, x, y, z]
+        
+        matrix = np.array([[0, -x[2], x[1], x[3], x[6]],
+                           [x[2], 0, -x[0], x[4], x[7]],
+                           [-x[1], x[0], 0, x[5], x[8]],
+                           [0,0,0,1,0],
+                           [0,0,0,0,1]], dtype=float)
         return matrix
 
 
