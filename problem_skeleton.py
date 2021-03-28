@@ -34,8 +34,8 @@ def imu_dynamics(state, inputs, dt):
     Rk1 = np.matmul(Rk,gamma_0(omega_k*dt))
     # vk1 = vk + np.matmul(np.matmul(Rk,gamma_1(omega_k*dt)),ak)*dt + g*dt
     # pk1 = pk + vk*dt + np.matmul(np.matmul(Rk,gamma_2(omega_k*dt)),ak)*(dt**2) + 0.5*g*(dt**2)
-    vk1 = vk + np.matmul(np.matmul(Rk,omega_k*dt),ak)*dt + g*dt
-    pk1 = pk + vk*dt + np.matmul(np.matmul(Rk,0.5*omega_k*dt),ak)*(dt**2) + 0.5*g*(dt**2)
+    vk1 = vk + np.matmul(np.matmul(Rk,np.eye(3)),ak)*dt + g*dt
+    pk1 = pk + vk*dt + np.matmul(np.matmul(Rk,0.5*np.eye(3)),ak)*(dt**2) + 0.5*g*(dt**2)
 
     new_state = np.eye(5)
     new_state[:3,:3] = Rk1
