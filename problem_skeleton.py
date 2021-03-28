@@ -48,9 +48,19 @@ def A_matrix():
     A = np.zeros((9,9))
     A[3,1] = -9.80665
     A[4,0] = 9.80665
-    A[7:9,3:6] = np.eye(3)
+    A[6:,3:6] = np.eye(3)
 
 def H_matrix(b): # Possibly nonconstant, but not likely we believe
+    '''
+    H is 5x9 real matrix satisfying
+    H*Xi = -Xi^{\wedge}*b, where we expect 
+    Xi = [Xi_omega1 Xi_omega2 Xi_omega3 Xi_a1 Xi_a2 Xi_a3 Xi_v1 Xi_v2 Xi_v3]^T
+    and
+    b = [0 0 0 1 0]^T
+
+    where Xi_ak is the k acceleration component, corresponding to the k velocity
+    component of the state, and likewise for Xi_vj to pj in the position.
+    '''
     H = np.zeros((5,9))
     H[:3,3:6] = -np.eye(3)
     return H

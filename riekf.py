@@ -20,7 +20,24 @@ class Right_IEKF:
 
     def Ad(self, X):
         # Adjoint of SO3 Adjoint (R) = R
-        return X
+        R = X[:3,:3]
+        v = X[:3,3]
+        p = X[:3,4]
+
+        v_wedge = np.array([[0, -v[2], v[1]],
+                            [v[2], 0, -v[0]],
+                            [-v[1], v[0], 0]])
+        p_wedge = np.array([[0, -p[2], p[1]],
+                            [p[2], 0, -p[0]],
+                            [-p[1], p[0], 0]])
+
+        adj = np.zeros((9,9))
+        adj[:3,:3] = R
+        adj[3:6,3:6] = R
+        adj[6:9,6:] = R
+        adj[3:6,:3] = np.matmul(v_wedge,R)
+        adj[6:,:3] = np.matmul(p_wedge,R)
+
 
     def skew(self,x):
         # This is useful for the rotation matrix
@@ -34,8 +51,8 @@ class Right_IEKF:
         matrix = np.array([[0, -x[2], x[1], x[3], x[6]],
                            [x[2], 0, -x[0], x[4], x[7]],
                            [-x[1], x[0], 0, x[5], x[8]],
-                           [0,0,0,1,0],
-                           [0,0,0,0,1]], dtype=float)
+                           [0,0,0,0,0],
+                           [0,0,0,0,0]], dtype=float)
         return matrix
 
 
