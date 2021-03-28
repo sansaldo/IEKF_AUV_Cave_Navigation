@@ -29,11 +29,13 @@ def imu_dynamics(state, inputs, dt):
     omega_k = inputs[:3,:3]
     ak = inputs[:3,3]
 
-    g = np.array([[0], [0], [9.81]])  # may need to make negative
+    g = np.array([[0], [0], [9.80665]])  # may need to make negative
 
     Rk1 = np.matmul(Rk,gamma_0(omega_k*dt))
-    vk1 = vk + np.matmul(np.matmul(Rk,gamma_1(omega_k*dt)),ak)*dt + g*dt
-    pk1 = pk + vk*dt + np.matmul(np.matmul(Rk,gamma_2(omega_k*dt)),ak)*(dt**2) + 0.5*g*dt
+    # vk1 = vk + np.matmul(np.matmul(Rk,gamma_1(omega_k*dt)),ak)*dt + g*dt
+    # pk1 = pk + vk*dt + np.matmul(np.matmul(Rk,gamma_2(omega_k*dt)),ak)*(dt**2) + 0.5*g*(dt**2)
+    vk1 = vk + np.matmul(np.matmul(Rk,omega_k*dt),ak)*dt + g*dt
+    pk1 = pk + vk*dt + np.matmul(np.matmul(Rk,0.5*omega_k*dt),ak)*(dt**2) + 0.5*g*(dt**2)
 
     new_state = np.eye(5)
     new_state[:3,:3] = Rk1
@@ -42,7 +44,13 @@ def imu_dynamics(state, inputs, dt):
 
     return new_state
 
+def A_matrix():
+    A = np.zeros((9,9))
+    A[3,1] = -9.80665
+    A[4,0] = 9.80665
+    A[7:9,3:6] = np.eye(3)
+
 def H_matrix(b): # Possibly nonconstant, but not likely we believe
     H = np.zeros((5,9))
-    H[:3,3:6] = np.eye(3)
+    H[:3,3:6] = -np.eye(3)
     return H
