@@ -37,6 +37,7 @@ class Right_IEKF:
         adj[6:9,6:] = R
         adj[3:6,:3] = np.matmul(v_wedge,R)
         adj[6:,:3] = np.matmul(p_wedge,R)
+        return adj
 
 
     def skew(self,x):
@@ -64,23 +65,27 @@ class Right_IEKF:
         :return:
         """
         u_lie = self.skew(u)
-        self.P = np.dot(np.dot(self.A, self.P), self.A.T) + np.dot(np.dot(self.Ad(self.X), self.Q), self.Ad(self.X).T)
+        Phi = expm(self.A*dt)  # see iekf slide 31, though in this case we may not have. Likely this is approximately I for sufficiently small dt. (still needs to be very small - like < 100 Hz)
+        # Phi = np.eye(self.A.shape[0])
+        Qd = np.matmul(np.matmul(Phi,self.Q),Phi.T)*dt  # discretized process noise, need to do Phi*Qd*Phi^T if Phi is not the identity
+        # self.P = np.dot(np.dot(self.A, self.P), self.A.T) + np.dot(np.dot(self.Ad(self.X), self.Q), self.Ad(self.X).T)
+        self.P = np.dot(np.dot(Phi, self.P), Phi) + np.dot(np.dot(self.Ad(self.X), Qd), self.Ad(self.X).T)
         self.X = self.f(self.X, u_lie, dt)
 
     def correction(self, Y, b):
         # Note that g is actually the measurement expected in global coordinate frame
         # RI-EKF correction Step
         # No need to stack measurments
-        N = np.dot(np.dot(self.X, self.N), self.X.T) # no need to use blkdiag cuz not add zeros
+        N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
         # filter gain
         H = self.H(b)
         S = np.dot(np.dot(H, self.P), H.T) + N
         L = np.dot(np.dot(self.P, H.T), np.linalg.inv(S))
 
         # Update state
-        nu = np.dot(self.X, Y).reshape(-1,1) - b
+        nu = np.dot(self.X, Y) - b
         delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
-        # I used the skew define here to move to lie algebra
+        # skew define here to move to lie algebra 
 
         self.X = np.dot(expm(delta), self.X)
 
