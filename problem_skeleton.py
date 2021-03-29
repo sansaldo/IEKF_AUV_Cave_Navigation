@@ -1,3 +1,4 @@
+from import_data import imu_data, dvl_data, imu_bias_data, depth_data, odom_data
 import numpy as np
 from scipy.linalg import  expm, block_diag
 from riekf import Right_IEKF
@@ -105,5 +106,36 @@ def toy_example():
     filt.correction(dummy_correction, b)
     print(filt.X)
 
+def data_example():
+    b = np.array([0, 0, 0, 1, 0]).T  # second to last element needs to be 1 because of homogeneous tranformation formulation
+
+    Q_omega = 0.1*np.eye(3)
+    Q_a = 0.1*np.eye(3)
+    Q = block_diag(Q_omega, Q_a, np.eye(3))
+
+    DVL_cov = 0.1*np.eye(3)
+    N = block_diag(DVL_cov, np.eye(2))  # needs to be 5x5 to match
+
+    sys = {
+        'f': imu_dynamics,
+        'A': A_matrix(),
+        'H': H_matrix,
+        'Q': Q,
+        'N': N,
+    }
+
+    filt = Right_IEKF(sys)
+    # dt is from 0, so just need first timestep
+    filt.prediction(imu_data.z[:,0], imu_data.time[0,0])
+    if imu_data.time[0,0] <= dvl_data.time[0,0]:
+        measurement = np.hstack((dvl_data.z[:,0], [1, 0]))
+    for i in range(1, min(imu_data.l,dvl_data.l)):
+        # Calculate proper dt
+        dt = imu_data.time[0,i] - imu_data.time[0,i-1]
+        filt.prediction(imu_data.z[:,i], dt)
+        # Naive matching here, merely to avoid correcting with something that came beforehand
+        if imu_data.time[0,i] <= dvl_data.time[0,i]:
+            measurement = np.hstack((dvl_data.z[:,i], [1, 0]))
+
 if __name__ == "__main__":
-    toy_example()
+    data_example()

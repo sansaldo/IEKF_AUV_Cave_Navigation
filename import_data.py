@@ -11,67 +11,77 @@ import pandas as pd
 
 cwd = os.getcwd()
 
-depth = np.array(pd.read_csv(cwd + '\sensor_data\depth_sensor.csv')) 
-dvl = np.array(pd.read_csv(cwd + '\sensor_data\dvl_linkquest.csv')) 
-#tf = np.array(pd.read_csv(cwd + '\sensor_data\tf.csv')) 
-imu = np.array(pd.read_csv(cwd + '\sensor_data\imu_adis_ros.csv')) 
-gt = np.array(pd.read_csv(cwd + '\sensor_data\odometry.csv')) 
-imu_bias = np.array(pd.read_csv(cwd + '\sensor_data\imu_adis.csv')) 
+depth = np.array(pd.read_csv(cwd + '/sensor_data/depth_sensor.csv')) 
+dvl = np.array(pd.read_csv(cwd + '/sensor_data/dvl_linkquest.csv')) 
+#tf = np.array(pd.read_csv(cwd + '/sensor_data/tf.csv')) 
+imu = np.array(pd.read_csv(cwd + '/sensor_data/imu_adis_ros.csv')) 
+gt = np.array(pd.read_csv(cwd + '/sensor_data/odometry.csv')) 
+imu_bias = np.array(pd.read_csv(cwd + '/sensor_data/imu_adis.csv')) 
 
 
 ####### DECLARE DATA CLASSES ####### 
 
 class odom_data:
+    l = len(gt)
     time = np.zeros((1, len(gt)))
     # 7x1: position.x, position.y, position.z, orientation.x, orientation.y, orientation.z, orientation.w
     z = np.zeros((7, len(gt)))
 	
-    def __init__(self, dvl):
+    def __init__(self, gt):
 
+        self.l = len(gt)
         self.time = np.zeros((1, len(gt)))
         self.z = np.zeros((7, len(gt)))
 
 class dvl_data:
+    l = len(dvl)
     time = np.zeros((1, len(dvl)))
     # 3x1 vector: field.velocityEarth0	field.velocityEarth1	field.velocityEarth2
     z = np.zeros((3, len(dvl)))
 	
     def __init__(self, dvl):
 
+        self.l = len(dvl)
         self.time = np.zeros((1, len(dvl)))
         self.z = np.zeros((3, len(dvl)))
 
 class depth_data:
+    l = len(depth)
     time = np.zeros((1, len(depth)))
     z = np.zeros((1, len(depth)))
 	
     def __init__(self, depth):
 
+        self.l = len(depth)
         self.time = np.zeros((1, len(depth)))
         self.z = np.zeros((1, len(depth)))
 
 class imu_data:
+    l = len(imu)
     time = np.zeros((1, len(imu)))
     # 9x1 vector: angular velocity x, angular velocity y, angular velocity z, linear accel x, linear accel y, linear accel z, x, y, z)
     z = np.zeros((9, len(imu)))
 	
     def __init__(self, imu):
 
+        self.l = len(imu)
         self.time = np.zeros((1, len(imu)))
         self.z = np.zeros((9, len(imu)))
 
 class imu_bias_data:
+    l = len(imu_bias)
     time = np.zeros((1, len(imu_bias)))
     # 3x1 vector: field.bx, field.by, field.bz
     z = np.zeros((3, len(imu_bias)))
 	
     def __init__(self, imu_bias):
 
+        self.l = len(imu_bias)
         self.time = np.zeros((1, len(imu_bias)))
         self.z = np.zeros((3, len(imu_bias)))
 
 
-####### PROCESS DATA ####### 
+####### PROCESS DATA #######
 for i in range(len(imu)):
     # t = rospy.Time.from_sec(imu[1,0])
     # seconds = t.to_sec() #floating point
