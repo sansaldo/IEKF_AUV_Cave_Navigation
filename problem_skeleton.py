@@ -2,6 +2,7 @@ from import_data import imu_data, dvl_data, imu_bias_data, depth_data, odom_data
 import numpy as np
 from scipy.linalg import  expm, block_diag
 from riekf import Right_IEKF
+from plot_ekf_results import plot_time_series, plot_2d, plot_3d
 
 def skew(omega):
     # Assume phi is a 3x1 vector
@@ -129,6 +130,11 @@ def data_example():
     filt.prediction(imu_data.z[:,0], imu_data.time[0,0])
     if imu_data.time[0,0] <= dvl_data.time[0,0]:
         measurement = np.hstack((dvl_data.z[:,0], [1, 0]))
+
+    # Need to collect predictions over time and ground truth (gt)
+    all_X_pred = []
+    all_X_gt = odom_data.z.T
+
     for i in range(1, min(imu_data.l,dvl_data.l)):
         # Calculate proper dt
         dt = imu_data.time[0,i] - imu_data.time[0,i-1]
@@ -136,6 +142,24 @@ def data_example():
         # Naive matching here, merely to avoid correcting with something that came beforehand
         if imu_data.time[0,i] <= dvl_data.time[0,i]:
             measurement = np.hstack((dvl_data.z[:,i], [1, 0]))
+
+        # Save prediction from this iteration
+        all_X_pred.append(filt.X[:3, 4])
+
+    all_X_pred = np.array(all_X_pred)
+    print(all_X_pred[0, :])
+    print(all_X_pred[100, :])
+    print(all_X_pred[1000, :])
+
+    # Plot 3D position graph to check results
+    plot_3d([all_X_pred[:100, 0], all_X_gt[:100, 0]], 
+            [all_X_pred[:100, 1], all_X_gt[:100, 1]], 
+            [all_X_pred[:100, 2], all_X_gt[:100, 2]],
+            'orientation_x', 'orientation_y', 'orientation_z',
+            ['predicted', 'ground truth'],
+            'RI-EKF Iteration 0 Results',
+            save_dir='../')
+
 
 if __name__ == "__main__":
     data_example()
