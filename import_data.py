@@ -112,3 +112,9 @@ for i in range(len(imu_bias)):
     # 3x1 vector: field.bx, field.by, field.bz
     imu_bias_data.z[:,i] = [imu_bias[i,20], imu_bias[i,21], imu_bias[i,22]]
 
+
+####### RUN MAIN ####### 
+
+if __name__ == "__main__":
+    toy_example() 
+    data_example() 
