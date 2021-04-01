@@ -76,6 +76,7 @@ class Right_IEKF:
         # Note that g is actually the measurement expected in global coordinate frame
         # RI-EKF correction Step
         # No need to stack measurments
+        Y = np.dot(self.X[:3,:3].T, Y)  #measurement model: v(dvl)=RT*vt (not 100% sure about this line)
         N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
         # filter gain
         H = self.H(b)
