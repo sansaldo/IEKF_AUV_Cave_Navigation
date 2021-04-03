@@ -69,7 +69,7 @@ class Right_IEKF:
         # Phi = np.eye(self.A.shape[0])
         Qd = np.matmul(np.matmul(Phi,self.Q),Phi.T)*dt  # discretized process noise, need to do Phi*Qd*Phi^T if Phi is not the identity
         # self.P = np.dot(np.dot(self.A, self.P), self.A.T) + np.dot(np.dot(self.Ad(self.X), self.Q), self.Ad(self.X).T)
-        self.P = np.dot(np.dot(Phi, self.P), Phi) + np.dot(np.dot(self.Ad(self.X), Qd), self.Ad(self.X).T)
+        self.P = np.dot(np.dot(Phi, self.P), Phi.T) + np.dot(np.dot(self.Ad(self.X), Qd), self.Ad(self.X).T)
         self.X = self.f(self.X, u_lie, dt)
 
     def correction(self, Y, b):
