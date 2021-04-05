@@ -64,6 +64,7 @@ class Right_IEKF:
         :param u: Note that u is actually the gyroscope reading
         :return:
         """
+        u[0:3] = u[0:3] - b_g
         u_lie = self.skew(u)
         Phi = expm(self.A*dt)  # see iekf slide 31, though in this case we may not have. Likely this is approximately I for sufficiently small dt. (still needs to be very small - like < 100 Hz)
         # Phi = np.eye(self.A.shape[0])
