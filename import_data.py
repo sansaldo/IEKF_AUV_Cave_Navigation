@@ -79,6 +79,17 @@ class imu_bias_data:
         self.time = np.zeros((1, len(imu_bias)))
         self.z = np.zeros((3, len(imu_bias)))
 
+class mag_data:
+    l = len(imu_bias)
+    time = np.zeros((1, len(imu_bias)))
+    # 3x1 vector: field.mx, field.my, field.mz
+    z = np.zeros((3, len(imu_bias)))
+	
+    def __init__(self, imu_bias):
+
+        self.l = len(imu_bias)
+        self.time = np.zeros((1, len(imu_bias)))
+        self.z = np.zeros((3, len(imu_bias)))
 
 ####### PROCESS DATA ####### 
 for i in range(len(imu)):
@@ -112,7 +123,13 @@ for i in range(len(imu_bias)):
     # 3x1 vector: field.bx, field.by, field.bz
     imu_bias_data.z[:,i] = [imu_bias[i,20], imu_bias[i,21], imu_bias[i,22]]
 
+for i in range(len(imu_bias)):
 
+    mag_data.time[:,i] = [imu_bias[i,0]]
+    # 3x1 vector: field.mx, field.my, field.mz
+    mag_data.z[:,i] = [imu_bias[i,11], imu_bias[i,12], imu_bias[i,13]]
+
+	
 ####### RUN MAIN ####### 
 
 if __name__ == "__main__":
