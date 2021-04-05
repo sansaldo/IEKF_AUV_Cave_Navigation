@@ -36,10 +36,14 @@ def imu_dynamics(state, inputs, dt):
     Rk = state[:3,:3]
     vk = state[:3,3]
     pk = state[:3,4]
-
+    # print(state)
     # Assume matrix form for inputs
-    omega_k = inputs[:3,:3]
-    ak = inputs[:3,3]
+    omega_k = inputs[:3,:3]   #3x3
+    ak = inputs[:3,3]         #3x1
+
+    # add bias
+    # b_g = imu_bias_data.z.T[]
+    # omega_k_bias = omega_k - b_g 
 
     g = np.array([0, 0, 9.80665])  # may need to make negative
 
@@ -54,13 +58,15 @@ def imu_dynamics(state, inputs, dt):
     new_state[:3,:3] = Rk1
     new_state[:3,3]  = vk1
     new_state[:3,4]  = pk1
-
+    # print(new_state)
     return new_state
 
 def A_matrix():
     A = np.zeros((9,9))
-    A[3,1] = -9.80665
-    A[4,0] = 9.80665
+    # A[3,1] = -9.80665
+    # A[4,0] = 9.80665
+    g = np.array([0, 0, 9.80665])
+    A[3:6,0:3] = skew(g)
     A[6:,3:6] = np.eye(3)
     return A
 
@@ -71,7 +77,6 @@ def H_matrix(b): # Possibly nonconstant, but not likely we believe
     Xi = [Xi_omega1 Xi_omega2 Xi_omega3 Xi_a1 Xi_a2 Xi_a3 Xi_v1 Xi_v2 Xi_v3]^T
     and
     b = [0 0 0 1 0]^T
-
     where Xi_ak is the k acceleration component, corresponding to the k velocity
     component of the state, and likewise for Xi_vj to pj in the position.
     '''
@@ -127,38 +132,54 @@ def data_example():
 
     filt = Right_IEKF(sys)
     # dt is from 0, so just need first timestep
-    filt.prediction(imu_data.z[:,0], imu_data.time[0,0])
+    dt1 = imu_data.time[0,0] * 1e-9
+    
+    filt.prediction(imu_data.z[:,0], 0.1, imu_bias_data.z[:,0])
     if imu_data.time[0,0] <= dvl_data.time[0,0]:
         measurement = np.hstack((dvl_data.z[:,0], [1, 0]))
+        filt.correction(measurement, b)
 
     # Need to collect predictions over time and ground truth (gt)
     all_X_pred = []
     all_X_gt = odom_data.z.T
+    b_g = imu_bias_data.z
 
     for i in range(1, min(imu_data.l,dvl_data.l)):
         # Calculate proper dt
         dt = imu_data.time[0,i] - imu_data.time[0,i-1]
-        filt.prediction(imu_data.z[:,i], dt)
+        dt = dt * 1e-9
+        # dt = dt/1000000000
+        # print(dt)
+        filt.prediction(imu_data.z[:,i], dt, b_g[:,i])
+
         # Naive matching here, merely to avoid correcting with something that came beforehand
         if imu_data.time[0,i] <= dvl_data.time[0,i]:
             measurement = np.hstack((dvl_data.z[:,i], [1, 0]))
+            filt.correction(measurement, b)
 
         # Save prediction from this iteration
         all_X_pred.append(filt.X[:3, 4])
 
     all_X_pred = np.array(all_X_pred)
-    print(all_X_pred[0, :])
-    print(all_X_pred[100, :])
-    print(all_X_pred[1000, :])
+
+    # print(all_X_gt[0, :])
 
     # Plot 3D position graph to check results
-    plot_3d([all_X_pred[:100, 0], all_X_gt[:100, 0]], 
-            [all_X_pred[:100, 1], all_X_gt[:100, 1]], 
-            [all_X_pred[:100, 2], all_X_gt[:100, 2]],
-            'orientation_x', 'orientation_y', 'orientation_z',
+    # plot_3d([all_X_pred[:, 0], all_X_gt[:, 0]], 
+    #         [all_X_pred[:, 1], all_X_gt[:, 1]], 
+    #         [all_X_pred[:, 2], all_X_gt[:, 2]],
+    #         'orientation_x', 'orientation_y', 'orientation_z',
+    #         ['predicted', 'ground truth'],
+    #         'RI-EKF Iteration 0 Results',
+    #         save_dir='../')
+
+    plot_2d([all_X_pred[:, 0], all_X_gt[:, 0]], 
+            [all_X_pred[:, 1], all_X_gt[:, 1]], 
+            'orientation_x', 'orientation_y', 
             ['predicted', 'ground truth'],
-            'RI-EKF Iteration 0 Results',
-            save_dir='../')
+            'RI-EKF Iteration',
+            save_dir='../'
+            )
 
 
 if __name__ == "__main__":
