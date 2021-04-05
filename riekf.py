@@ -57,7 +57,7 @@ class Right_IEKF:
         return matrix
 
 
-    def prediction(self, u, dt):
+    def prediction(self, u, dt, b_g=0):
         # EKF propagation (prediction) step
         """
 
