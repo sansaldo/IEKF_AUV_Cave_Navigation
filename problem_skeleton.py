@@ -45,7 +45,7 @@ def imu_dynamics(state, inputs, dt):
     # b_g = imu_bias_data.z.T[]
     # omega_k_bias = omega_k - b_g 
 
-    g = np.array([0, 0, 9.80665])  # may need to make negative
+    g = np.array([0, 0, -9.80665])  # may need to make negative
 
     # Rk1 = np.matmul(Rk,gamma_0(omega_k*dt))
     # vk1 = vk + np.matmul(np.matmul(Rk,gamma_1(omega_k*dt)),ak)*dt + g*dt
@@ -65,7 +65,7 @@ def A_matrix():
     A = np.zeros((9,9))
     # A[3,1] = -9.80665
     # A[4,0] = 9.80665
-    g = np.array([0, 0, 9.80665])
+    g = np.array([0, 0, -9.80665])
     A[3:6,0:3] = skew(g)
     A[6:,3:6] = np.eye(3)
     return A
@@ -144,18 +144,23 @@ def data_example():
     all_X_gt = odom_data.z.T
     b_g = imu_bias_data.z
 
-    for i in range(1, min(imu_data.l,dvl_data.l)):
-        # Calculate proper dt
-        dt = imu_data.time[0,i] - imu_data.time[0,i-1]
-        dt = dt * 1e-9
+    imu_ind = 1
+    dvl_ind = 0
+    # for i in range(4, min(imu_data.l,dvl_data.l),4):
+    while imu_ind < imu_data.l and dvl_ind < dvl_data.l:
+        # Calculate proper dt)
         # dt = dt/1000000000
-        # print(dt)
-        filt.prediction(imu_data.z[:,i], dt, b_g[:,i])
 
         # Naive matching here, merely to avoid correcting with something that came beforehand
-        if imu_data.time[0,i] <= dvl_data.time[0,i]:
-            measurement = np.hstack((dvl_data.z[:,i], [1, 0]))
+        if imu_data.time[0,imu_ind] <= dvl_data.time[0,dvl_ind]:
+            dt = imu_data.time[0,imu_ind] - imu_data.time[0,imu_ind-1]
+            dt = dt * 1e-9
+            filt.prediction(imu_data.z[:,imu_ind], dt) #, b_g[:,i])
+            imu_ind += 1
+        else:
+            measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0]))
             filt.correction(measurement, b)
+            dvl_ind += 1
 
         # Save prediction from this iteration
         all_X_pred.append(filt.X[:3, 4])
