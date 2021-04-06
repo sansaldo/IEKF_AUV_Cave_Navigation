@@ -1,4 +1,4 @@
-from import_data import imu_data, dvl_data, imu_bias_data, depth_data, odom_data
+from import_data import imu_data, dvl_data, imu_bias_data, depth_data, odom_data, initial_pose
 import numpy as np
 from scipy.linalg import  expm, block_diag
 from riekf import Right_IEKF
@@ -122,13 +122,23 @@ def data_example():
     DVL_cov = 0.1*np.eye(3)
     N = block_diag(DVL_cov, np.eye(2))  # needs to be 5x5 to match
 
+    X0 = np.eye(5)
+    X0[:3,:3] = initial_pose.R
+    X0[:3,4] = initial_pose.p
     sys = {
         'f': imu_dynamics,
         'A': A_matrix(),
         'H': H_matrix,
         'Q': Q,
         'N': N,
+        'X': X0,
     }
+
+    imu_to_dvl = np.array([0, 0.38, 0.07]).T
+    d_skew = skew(imu_to_dvl)
+    R_imu_dvl = np.array([[0, 1, 0],
+                          [1, 0, 0],
+                          [0, 0, -1]])
 
     filt = Right_IEKF(sys)
     # dt is from 0, so just need first timestep
@@ -137,6 +147,8 @@ def data_example():
     filt.prediction(imu_data.z[:,0], 0.1, imu_bias_data.z[:,0])
     if imu_data.time[0,0] <= dvl_data.time[0,0]:
         measurement = np.hstack((dvl_data.z[:,0], [1, 0]))
+        # twist_velocity = np.matmul( d_skew, (imu_data.z[:3,0]) )  # - imu_bias_data.z[:3,0])) )
+        # measurement = np.hstack(( (dvl_data.z[:,0]-twist_velocity), [1,0] ))
         filt.correction(measurement, b)
 
     # Need to collect predictions over time and ground truth (gt)
@@ -152,13 +164,15 @@ def data_example():
         # dt = dt/1000000000
 
         # Naive matching here, merely to avoid correcting with something that came beforehand
-        if imu_data.time[0,imu_ind] <= dvl_data.time[0,dvl_ind]:
+        if imu_data.time[0,imu_ind] < dvl_data.time[0,dvl_ind]:
             dt = imu_data.time[0,imu_ind] - imu_data.time[0,imu_ind-1]
             dt = dt * 1e-9
-            filt.prediction(imu_data.z[:,imu_ind], dt) #, b_g[:,i])
+            filt.prediction(imu_data.z[:,imu_ind], dt, b_g[:,imu_ind])
             imu_ind += 1
         else:
             measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0]))
+            # twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
+            # measurement = np.hstack(( (dvl_data.z[:,dvl_ind]-twist_velocity), [1,0] ))
             filt.correction(measurement, b)
             dvl_ind += 1
 

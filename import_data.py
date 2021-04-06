@@ -67,6 +67,14 @@ class imu_data:
         self.time = np.zeros((1, len(imu)))
         self.z = np.zeros((9, len(imu)))
 
+class initial_pose:
+    p = np.zeros((3))
+    R = np.eye(3)
+
+    def __init__(self, imu):
+        self.p = np.zeros((3))
+        self.R = np.eye(3)
+
 class imu_bias_data:
     l = len(imu_bias)
     time = np.zeros((1, len(imu_bias)))
@@ -109,13 +117,79 @@ for i in range(len(dvl)):
     # World frame
     dvl_data.time[:,i] = [dvl[i,0]]
     # 3x1 vector: field.velocityEarth0	field.velocityEarth1	field.velocityEarth2
-    dvl_data.z[:,i] = [dvl[i,27], dvl[i,28], dvl[i,29]]
+    # dvl_data.z[:,i] = [dvl[i,27], dvl[i,28], dvl[i,29]]
+    dvl_data.z[:,i] = [dvl[i,28], dvl[i,27], -dvl[i,29]]  # expected based on frames figure from paper
+
+T = np.eye(4)
+T[2,2] = -1
+T[3,3] = -1
+T[0,3] = 0
+T[1,3] = 0.64
+T[2,3] = 0.09
+
+def quaternion_rotation_matrix(Q):
+    """
+    Covert a quaternion into a full three-dimensional rotation matrix.
+ 
+    Input
+    :param Q: A 4 element array representing the quaternion (q0,q1,q2,q3) 
+ 
+    Output
+    :return: A 3x3 element matrix representing the full 3D rotation matrix. 
+             This rotation matrix converts a point in the local reference 
+             frame to a point in the global reference frame.
+
+    Courtesy of: https://automaticaddison.com/how-to-convert-a-quaternion-to-a-rotation-matrix/
+    """
+    # Extract the values from Q
+    q0 = Q[0]
+    q1 = Q[1]
+    q2 = Q[2]
+    q3 = Q[3]
+     
+    # First row of the rotation matrix
+    r00 = 2 * (q0 * q0 + q1 * q1) - 1
+    r01 = 2 * (q1 * q2 - q0 * q3)
+    r02 = 2 * (q1 * q3 + q0 * q2)
+     
+    # Second row of the rotation matrix
+    r10 = 2 * (q1 * q2 + q0 * q3)
+    r11 = 2 * (q0 * q0 + q2 * q2) - 1
+    r12 = 2 * (q2 * q3 - q0 * q1)
+     
+    # Third row of the rotation matrix
+    r20 = 2 * (q1 * q3 - q0 * q2)
+    r21 = 2 * (q2 * q3 + q0 * q1)
+    r22 = 2 * (q0 * q0 + q3 * q3) - 1
+     
+    # 3x3 rotation matrix
+    rot_matrix = np.array([[r00, r01, r02],
+                           [r10, r11, r12],
+                           [r20, r21, r22]])
+                            
+    return rot_matrix
 
 for i in range(len(gt)):
     # World frame
     odom_data.time[:,i] = [gt[i,0]]
     # 7x1: position.x, position.y, position.z, orientation.x, orientation.y, orientation.z, orientation.w
-    odom_data.z[:,i] = [ gt[i,3], gt[i,4], gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ]
+    # odom_data.z[:,i] = [ gt[i,3], gt[i,4], gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ]
+    # odom_data.z[:,i] = [ -gt[i,4], -gt[i,3], gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ] # black magic
+    odom_data.z[:,i] = [ gt[i,3], -gt[i,4], -gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ] # expected based on frame figure from paper
+    # Q = [gt[i,9], gt[i,6], gt[i,7], gt[i,8]]
+    # R = quaternion_rotation_matrix(Q)
+    # Hc = np.eye(4)
+    # Hc[:3,:3] = R
+    # Hc[0,3] = gt[i,3]
+    # Hc[1,3] = gt[i,4]
+    # Hc[2,3] = gt[i,5]
+    # Hi = np.linalg.solve(T, np.matmul(Hc, T))
+
+    # odom_data.z[:,i] = [ Hi[0,3], Hi[1,3], Hi[2,3], 0, 0, 0, 0]  # dummy zeros because I don't want to convert quaternions rn
+
+# initial_pose.p[:] = 0
+qx,qy,qz,qw = imu[0,3:7]
+initial_pose.R = quaternion_rotation_matrix([qw, qx, qy, qz])
 
 for i in range(len(imu_bias)):
 

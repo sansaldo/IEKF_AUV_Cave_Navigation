@@ -15,8 +15,8 @@ class Right_IEKF:
         # Note that measurement error matrix is a constant for this problem, cuz gravity duhh
         self.Q = system['Q']  # input noise covariance
         self.N = system['N']  # measurement noise covariance
-        self.X = np.eye(5)  # state vector
-        self.P = 0.1 * np.eye(9)  # state covariance
+        self.X = system['X'] if 'X' in system else np.eye(5) # state vector
+        self.P = system['P'] if 'P' in system else 0.1 * np.eye(9)  # state covariance
 
     def Ad(self, X):
         # Adjoint of SO3 Adjoint (R) = R
@@ -34,7 +34,7 @@ class Right_IEKF:
         adj = np.zeros((9,9))
         adj[:3,:3] = R
         adj[3:6,3:6] = R
-        adj[6:9,6:] = R
+        adj[6:,6:] = R
         adj[3:6,:3] = np.matmul(v_wedge,R)
         adj[6:,:3] = np.matmul(p_wedge,R)
         return adj
