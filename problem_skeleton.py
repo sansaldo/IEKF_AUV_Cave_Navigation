@@ -80,8 +80,28 @@ def H_matrix(b): # Possibly nonconstant, but not likely we believe
     where Xi_ak is the k acceleration component, corresponding to the k velocity
     component of the state, and likewise for Xi_vj to pj in the position.
     '''
+    # H = np.zeros((5,9))
+    # H[:3,3:6] = -np.eye(3)
+    H = np.zeros((3,9))
+    H[:,3:6] = -np.eye(3)
+    return H
+
+def H_matrix_dvl_depth(b):
     H = np.zeros((5,9))
     H[:3,3:6] = -np.eye(3)
+    H[:3,6:] = -np.eye(3)
+    return H
+
+def H_stacked(b):
+    H = np.zeros((4,9))
+    H[:3,3:6] = -np.eye(3)
+    H[3,8] = -1
+    # H = np.zeros((6,9))
+    # H[:3,3:6] = -np.eye(3)
+    # H[3:,6:] = -np.eye(3)
+    # H = np.zeros((10,9))
+    # H[:3,3:6] = -np.eye(3)
+    # H[3:6,6:] = -np.eye(3)
     return H
 
 def toy_example():
@@ -113,14 +133,20 @@ def toy_example():
     print(filt.X)
 
 def data_example():
-    b = np.array([0, 0, 0, 1, 0]).T  # second to last element needs to be 1 because of homogeneous tranformation formulation
+    # b = np.array([0, 0, 0, 1, 0]).T  # second to last element needs to be 1 because of homogeneous tranformation formulation
+    # b = np.array([0, 0, 0, 1, 1]).T  # experimenting to see about adding depth
+    b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1]).T  # experimental, for stacking dvl and depth measurements
 
     Q_omega = 0.1*np.eye(3)
     Q_a = 0.1*np.eye(3)
-    Q = block_diag(Q_omega, Q_a, np.eye(3))
+    Q = block_diag(Q_omega, Q_a, np.matmul(Q_a.T,Q_a))
 
     DVL_cov = 0.1*np.eye(3)
-    N = block_diag(DVL_cov, np.eye(2))  # needs to be 5x5 to match
+    # N = block_diag(DVL_cov, np.eye(2))
+    # needs to be 5x5 to match, check if diagonalization is correct here (according to se2, rest should be zero. 
+    # However, when we do that in practice the correction step gives us a singular matrix?). 
+    # Permutation of axes does not matter as long as we have a diagonal covariance.
+    N = block_diag(DVL_cov, np.zeros((2,2)))  
 
     X0 = np.eye(5)
     X0[:3,:3] = initial_pose.R
@@ -128,7 +154,9 @@ def data_example():
     sys = {
         'f': imu_dynamics,
         'A': A_matrix(),
-        'H': H_matrix,
+        # 'H': H_matrix,
+        # 'H': H_matrix_dvl_depth,
+        'H': H_stacked,
         'Q': Q,
         'N': N,
         'X': X0,
@@ -139,27 +167,33 @@ def data_example():
     R_imu_dvl = np.array([[0, 1, 0],
                           [1, 0, 0],
                           [0, 0, -1]])
+    T_imu_depth = np.eye(4)
+    T_imu_depth[:3,3] = np.array([0, 0.32, 0.17]).T
+    T_depth_imu = np.eye(4)
+    T_depth_imu[:3,3] = -np.array([0, 0.32, 0.17]).T
 
     filt = Right_IEKF(sys)
     # dt is from 0, so just need first timestep
     dt1 = imu_data.time[0,0] * 1e-9
     
-    filt.prediction(imu_data.z[:,0], 0.1, imu_bias_data.z[:,0])
-    if imu_data.time[0,0] <= dvl_data.time[0,0]:
-        measurement = np.hstack((dvl_data.z[:,0], [1, 0]))
-        # twist_velocity = np.matmul( d_skew, (imu_data.z[:3,0]) )  # - imu_bias_data.z[:3,0])) )
-        # measurement = np.hstack(( (dvl_data.z[:,0]-twist_velocity), [1,0] ))
-        filt.correction(measurement, b)
 
     # Need to collect predictions over time and ground truth (gt)
     all_X_pred = []
     all_X_gt = odom_data.z.T
     b_g = imu_bias_data.z
 
+    filt.prediction(imu_data.z[:,0], 0.1, imu_bias_data.z[:,0])
+    # if imu_data.time[0,0] <= dvl_data.time[0,0]:
+    #     measurement = np.hstack((dvl_data.z[:,0], [1, 0]))
+    #     # twist_velocity = np.matmul( d_skew, (imu_data.z[:3,0]) )  # - imu_bias_data.z[:3,0])) )
+    #     # measurement = np.hstack(( (dvl_data.z[:,0]-twist_velocity), [1,0] ))
+    #     filt.correction(measurement, b)
+
     imu_ind = 1
     dvl_ind = 0
+    depth_ind = 0
     # for i in range(4, min(imu_data.l,dvl_data.l),4):
-    while imu_ind < imu_data.l and dvl_ind < dvl_data.l:
+    while imu_ind < imu_data.l and dvl_ind < dvl_data.l and depth_ind < depth_data.l:
         # Calculate proper dt)
         # dt = dt/1000000000
 
@@ -167,13 +201,33 @@ def data_example():
         if imu_data.time[0,imu_ind] < dvl_data.time[0,dvl_ind]:
             dt = imu_data.time[0,imu_ind] - imu_data.time[0,imu_ind-1]
             dt = dt * 1e-9
-            filt.prediction(imu_data.z[:,imu_ind], dt, b_g[:,imu_ind])
+            filt.prediction(imu_data.z[:,imu_ind], dt)  #, b_g[:,imu_ind])
             imu_ind += 1
         else:
-            measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0]))
+            # Note to self: add correction for depth sensor relative to IMU - this will need to include rotation, and might fix weirdness
+            depth_position = filt.X[:3,4]
+            # depth_position = 0
+            while depth_data.time[0,depth_ind] < dvl_data.time[0,dvl_ind]:
+                depth_position[2] = -depth_data.z[0,depth_ind]
+                # depth_position = -depth_data.z[0,depth_ind]
+                depth_ind += 1
+            # print(depth_position, filt.X[:3,4])
+            depth_position = -np.matmul(filt.X[:3,:3].T, depth_position)
+
+            # depth_sensor_predicted = np.matmul(T_imu_depth, np.matmul(filt.X, T_depth_imu))
+            # depth_sensor_predicted = np.matmul(T_imu_depth, np.matmul(filt.X[[0,1,2,4],:][:,[0,1,2,4]], T_depth_imu))
+            # print(depth_sensor_predicted, filt.X)
+            # depth_sensor_predicted[2,3] = depth_position  # adjust z to expected
+            # depth_position = np.matmul(T_depth_imu, np.linalg.solve(depth_sensor_predicted, T_imu_depth))[:3,3]
+
+            measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0], depth_position, [0, 1]))
+            # measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0, 0, 0, depth_position, 0, 1]))
+            filt.correction_stacked(measurement, b)
+
+            # measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0]))
             # twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
             # measurement = np.hstack(( (dvl_data.z[:,dvl_ind]-twist_velocity), [1,0] ))
-            filt.correction(measurement, b)
+            # filt.correction(measurement, b)
             dvl_ind += 1
 
         # Save prediction from this iteration
@@ -184,21 +238,21 @@ def data_example():
     # print(all_X_gt[0, :])
 
     # Plot 3D position graph to check results
-    # plot_3d([all_X_pred[:, 0], all_X_gt[:, 0]], 
-    #         [all_X_pred[:, 1], all_X_gt[:, 1]], 
-    #         [all_X_pred[:, 2], all_X_gt[:, 2]],
-    #         'orientation_x', 'orientation_y', 'orientation_z',
-    #         ['predicted', 'ground truth'],
-    #         'RI-EKF Iteration 0 Results',
-    #         save_dir='../')
-
-    plot_2d([all_X_pred[:, 0], all_X_gt[:, 0]], 
+    plot_3d([all_X_pred[:, 0], all_X_gt[:, 0]], 
             [all_X_pred[:, 1], all_X_gt[:, 1]], 
-            'orientation_x', 'orientation_y', 
+            [all_X_pred[:, 2], all_X_gt[:, 2]],
+            'orientation_x', 'orientation_y', 'orientation_z',
             ['predicted', 'ground truth'],
-            'RI-EKF Iteration',
-            save_dir='../'
-            )
+            'RI-EKF Iteration 0 Results',
+            save_dir='../')
+
+    # plot_2d([all_X_pred[:, 0], all_X_gt[:, 0]], 
+    #         [all_X_pred[:, 1], all_X_gt[:, 1]], 
+    #         'orientation_x', 'orientation_y', 
+    #         ['predicted', 'ground truth'],
+    #         'RI-EKF Iteration',
+    #         save_dir='../'
+    #         )
 
 
 if __name__ == "__main__":

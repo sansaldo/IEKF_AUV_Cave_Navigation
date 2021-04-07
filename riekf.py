@@ -1,5 +1,5 @@
 import numpy as np
-from scipy.linalg import  expm
+from scipy.linalg import expm, block_diag
 
 
 class Right_IEKF:
@@ -78,6 +78,10 @@ class Right_IEKF:
         # RI-EKF correction Step
         # No need to stack measurments
         N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
+
+        # test change in performance when truncating H, nu, and N
+        N = N[:3,:3]
+
         # filter gain
         H = self.H(b)
         S = np.dot(np.dot(H, self.P), H.T) + N
@@ -85,6 +89,10 @@ class Right_IEKF:
 
         # Update state
         nu = np.dot(self.X, Y) - b
+
+        # test change in performance when truncating H, nu, and N
+        nu = nu[:3]  #0,1,2 are what we really care about
+
         delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
         # skew define here to move to lie algebra 
 
@@ -95,6 +103,34 @@ class Right_IEKF:
         temp = I - np.dot(L, H)
         self.P = np.dot(np.dot(temp, self.P), temp.T) + np.dot(np.dot(L, N), L.T)
 
+    def correction_stacked(self, Y, b):
+        # Note that g is actually the measurement expected in global coordinate frame
+        # RI-EKF correction Step
+        # No need to stack measurments
+        X_stacked = block_diag(self.X, self.X)
+        N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
+        # N_stacked = block_diag(N[:3,:3],N[:3,:3])  # just want 6x6
+        N_stacked = block_diag(N[:3,:3],N[2,2])  # just want 4x4 for *even more* stacking weirdness
+        # filter gain
+        H = self.H(b)
+        S = np.dot(np.dot(H, self.P), H.T) + N_stacked
+        L = np.dot(np.dot(self.P, H.T), np.linalg.inv(S))
+
+        # Update state
+        nu = np.dot(X_stacked, Y) - b
+        # want to eliminate "dead" rows of nu: with 0 index, these are rows 3,4,8,9 (rows 0,1,2 and 5,6,7 are active)
+        # nu = nu[[0,1,2,5,6,7]]
+        # OR if we literally *only* want depth we make the "hot" rows 0,1,2,7
+        nu = nu[[0,1,2,7]]
+        delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
+        # skew define here to move to lie algebra 
+
+        self.X = np.dot(expm(delta), self.X)
+
+        # Update Covariance
+        I = np.eye(np.shape(self.P)[0])
+        temp = I - np.dot(L, H)
+        self.P = np.dot(np.dot(temp, self.P), temp.T) + np.dot(np.dot(L, N_stacked), L.T)
 
 
 

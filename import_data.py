@@ -121,8 +121,8 @@ for i in range(len(dvl)):
     dvl_data.z[:,i] = [dvl[i,28], dvl[i,27], -dvl[i,29]]  # expected based on frames figure from paper
 
 T = np.eye(4)
+T[1,1] = -1
 T[2,2] = -1
-T[3,3] = -1
 T[0,3] = 0
 T[1,3] = 0.64
 T[2,3] = 0.09
@@ -175,21 +175,22 @@ for i in range(len(gt)):
     # 7x1: position.x, position.y, position.z, orientation.x, orientation.y, orientation.z, orientation.w
     # odom_data.z[:,i] = [ gt[i,3], gt[i,4], gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ]
     # odom_data.z[:,i] = [ -gt[i,4], -gt[i,3], gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ] # black magic
-    odom_data.z[:,i] = [ gt[i,3], -gt[i,4], -gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ] # expected based on frame figure from paper
-    # Q = [gt[i,9], gt[i,6], gt[i,7], gt[i,8]]
-    # R = quaternion_rotation_matrix(Q)
-    # Hc = np.eye(4)
-    # Hc[:3,:3] = R
-    # Hc[0,3] = gt[i,3]
-    # Hc[1,3] = gt[i,4]
-    # Hc[2,3] = gt[i,5]
-    # Hi = np.linalg.solve(T, np.matmul(Hc, T))
+    # odom_data.z[:,i] = [ gt[i,3], -gt[i,4], -gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ] # expected based on frame figure from paper
+    Q = [gt[i,9], gt[i,6], gt[i,7], gt[i,8]]
+    R = quaternion_rotation_matrix(Q)
+    Hc = np.eye(4)
+    Hc[:3,:3] = R
+    Hc[0,3] = gt[i,3]
+    Hc[1,3] = gt[i,4]
+    Hc[2,3] = gt[i,5]
+    Hi = np.linalg.solve(T, np.matmul(Hc, T))
 
-    # odom_data.z[:,i] = [ Hi[0,3], Hi[1,3], Hi[2,3], 0, 0, 0, 0]  # dummy zeros because I don't want to convert quaternions rn
+    odom_data.z[:,i] = [ Hi[0,3], Hi[1,3], Hi[2,3], 0, 0, 0, 0]  # dummy zeros because I don't want to convert quaternions rn
 
 # initial_pose.p[:] = 0
 qx,qy,qz,qw = imu[0,3:7]
 initial_pose.R = quaternion_rotation_matrix([qw, qx, qy, qz])
+initial_pose.p[2] = -depth_data.z[0,0]
 
 for i in range(len(imu_bias)):
 
