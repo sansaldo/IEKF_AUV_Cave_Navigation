@@ -93,12 +93,12 @@ def H_matrix_dvl_depth(b):
     return H
 
 def H_stacked(b):
-    H = np.zeros((4,9))
-    H[:3,3:6] = -np.eye(3)
-    H[3,8] = -1
-    # H = np.zeros((6,9))
+    # H = np.zeros((4,9))
     # H[:3,3:6] = -np.eye(3)
-    # H[3:,6:] = -np.eye(3)
+    # H[3,8] = -1
+    H = np.zeros((6,9))
+    H[:3,3:6] = -np.eye(3)
+    H[3:,6:] = -np.eye(3)
     # H = np.zeros((10,9))
     # H[:3,3:6] = -np.eye(3)
     # H[3:6,6:] = -np.eye(3)
@@ -205,27 +205,35 @@ def data_example():
             imu_ind += 1
         else:
             # Note to self: add correction for depth sensor relative to IMU - this will need to include rotation, and might fix weirdness
-            depth_position = filt.X[:3,4]
-            # depth_position = 0
+            # depth_position = filt.X[:3,4]
+            depth_position = 0
             while depth_data.time[0,depth_ind] < dvl_data.time[0,dvl_ind]:
-                depth_position[2] = -depth_data.z[0,depth_ind]
-                # depth_position = -depth_data.z[0,depth_ind]
+                # depth_position[2] = -depth_data.z[0,depth_ind]
+                depth_position = -depth_data.z[0,depth_ind]
                 depth_ind += 1
-            # print(depth_position, filt.X[:3,4])
-            depth_position = -np.matmul(filt.X[:3,:3].T, depth_position)
+            # depth_position = -np.matmul(filt.X[:3,:3].T, depth_position)
 
             # depth_sensor_predicted = np.matmul(T_imu_depth, np.matmul(filt.X, T_depth_imu))
             # depth_sensor_predicted = np.matmul(T_imu_depth, np.matmul(filt.X[[0,1,2,4],:][:,[0,1,2,4]], T_depth_imu))
-            # print(depth_sensor_predicted, filt.X)
             # depth_sensor_predicted[2,3] = depth_position  # adjust z to expected
+
+            Xp = filt.X[[0,1,2,4],:][:,[0,1,2,4]]
+            pi = np.array([0, 0.32, 0.17, 1]).T  # position of depth sensor in IMU coordinates, homogeneous
+            pw = np.matmul(Xp, pi)  # position of depth sensor in world frame
+            w_delta_p = np.array([0, 0, depth_position - pw[2]]).T  # get delta between depth sensor predicted and measured, in world frame coordinates
+            pw_prime = filt.X[:3,4] + w_delta_p
+            # print(depth_position, pw, filt.X[:3,4], pw_prime)
+            depth_sensor_predicted = -np.matmul( filt.X[:3,:3].T, pw_prime )  # rotate so vector is in robot frame
+
             # depth_position = np.matmul(T_depth_imu, np.linalg.solve(depth_sensor_predicted, T_imu_depth))[:3,3]
 
-            measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0], depth_position, [0, 1]))
+            # measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0], depth_sensor_predicted[:3], [0, 1]))
+            twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
+            measurement = np.hstack((dvl_data.z[:,dvl_ind]-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1]))
             # measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0, 0, 0, depth_position, 0, 1]))
             filt.correction_stacked(measurement, b)
 
             # measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0]))
-            # twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
             # measurement = np.hstack(( (dvl_data.z[:,dvl_ind]-twist_velocity), [1,0] ))
             # filt.correction(measurement, b)
             dvl_ind += 1
