@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn.metrics import mean_squared_error
 from itertools import product
+from constants import cone_times, cone_distances
 
 # Calculates MSE of ground truth (gt) and predicted trajectories
 # gt and predicted should be shape (number of timesteps, number of dimensions),
@@ -25,14 +26,12 @@ def mse(gt, predicted, gt_times=None, predicted_times=None):
             if t in predicted_times:
                 gt_new.append(sample)
         gt_new = np.array(gt_new)
-        print(gt_new)
 
         predicted_new = []
         for t, sample in zip(predicted_times, predicted):
             if t in gt_times:
                 predicted_new.append(sample)
         predicted_new = np.array(predicted_new)
-        print(predicted_new)
 
         mse = mean_squared_error(gt_new.flatten(), predicted_new.flatten())
 
@@ -41,11 +40,9 @@ def mse(gt, predicted, gt_times=None, predicted_times=None):
 # Measures 2 cone metrics from Angelos et al., 2016
 # pos: array of shape (number of pred timesteps, 3) for xyz predictions to evaluate
 # times: array of shape (number of pred timesteps) for the evaluated estimation
-# cone_times: array of shape (number of cones, 2) for the two times each cone was seen
-# cone_distances: known distances between cones; array of shape (number of cones, number of cones) where [i,j] = distance between cones i and j
 # cone_offsets: (optional) array of shape (number of cones, 2, 3) containing the xyz offset for each cone based on first and second camera observation
 # Returns a dictionary of metrics
-def cone_metrics(pos, times, cone_times, cone_distances, cone_offsets=None):
+def cone_metrics(pos, times, cone_offsets=None):
     return_metrics = {}
     no_cones = cone_times.shape[0]
     for i in range(no_cones):
@@ -64,7 +61,8 @@ def cone_metrics(pos, times, cone_times, cone_distances, cone_offsets=None):
         return_metrics['%s_2pass_2norm' % str(i)] = np.linalg.norm(pred_xyz0 - pred_xyz1, ord=2)
 
     for i, j in product(list(range(no_cones)), repeat=2):
-        if i == j:
+        # We don't have all distances - if we don't, don't compute metric
+        if cone_distances[i,j] <= 0.:
             continue
 
         # First cone (first and second pass)

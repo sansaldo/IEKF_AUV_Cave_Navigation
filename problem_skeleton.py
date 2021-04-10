@@ -177,7 +177,9 @@ def data_example():
 
     # Need to collect predictions over time and ground truth (gt)
     all_X_pred = []
-    all_X_gt = odom_data.z.T
+    all_time_pred = []
+    all_X_gt = odom_data.z.T 
+    all_time_gt = odom_data.time[0, :] * 1e-9
     b_g = imu_bias_data.z
 
     filt.prediction(imu_data.z[:,0], 0.1)
@@ -185,6 +187,7 @@ def data_example():
     imu_ind = 1
     dvl_ind = 0
     depth_ind = 0
+    latest_time = min(imu_data.time[0, 0], dvl_data.time[0, 0], depth_data.time[0, 0]) * 1e-9
     while imu_ind < imu_data.l and dvl_ind < dvl_data.l and depth_ind < depth_data.l:
 
         # Naive matching here, merely to avoid correcting with something that came beforehand
@@ -195,6 +198,8 @@ def data_example():
             
             filt.prediction(imu_data.z[:,imu_ind], dt, dw)
             imu_ind += 1
+
+            latest_time = imu_data.time[0,imu_ind] * 1e-9
         else:
             # Note to self: add correction for depth sensor relative to IMU - this will need to include rotation, and might fix weirdness
             depth_position = filt.X[:3,4]
@@ -220,8 +225,12 @@ def data_example():
 
         # Save prediction from this iteration
         all_X_pred.append(filt.X[:3, 4])
+        all_time_pred.append(latest_time)
 
     all_X_pred = np.array(all_X_pred)
+    all_time_pred = np.array(all_time_pred)
+    
+    all_times = [all_time_pred, all_time_gt]
 
     # print(all_X_gt[0, :])
 
@@ -232,15 +241,16 @@ def data_example():
             'orientation_x', 'orientation_y', 'orientation_z',
             ['predicted', 'ground truth'],
             'RI-EKF Iteration 0 Results',
-            save_dir='../')
+            save_dir='../',
+            state_times=all_times)
 
-    # plot_2d([all_X_pred[:, 0], all_X_gt[:, 0]], 
-    #         [all_X_pred[:, 1], all_X_gt[:, 1]], 
-    #         'orientation_x', 'orientation_y', 
-    #         ['predicted', 'ground truth'],
-    #         'RI-EKF Iteration',
-    #         save_dir='../'
-    #         )
+    plot_2d([all_X_pred[:, 0], all_X_gt[:, 0]], 
+            [all_X_pred[:, 1], all_X_gt[:, 1]], 
+            'orientation_x', 'orientation_y', 
+            ['predicted', 'ground truth'],
+            'RI-EKF Iteration',
+            save_dir='../',
+            state_times=all_times)
 
 
 if __name__ == "__main__":
