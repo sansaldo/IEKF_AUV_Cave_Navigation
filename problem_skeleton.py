@@ -1,4 +1,4 @@
-from import_data import imu_data, dvl_data, imu_bias_data, depth_data, odom_data, initial_pose
+from import_data import imu_data, dvl_data, imu_bias_data, depth_data, odom_data, initial_pose, mag_data
 import numpy as np
 from scipy.linalg import  expm, block_diag
 from riekf import Right_IEKF
@@ -93,9 +93,10 @@ def H_matrix_dvl_depth(b):
     return H
 
 def H_stacked(b):
-    H = np.zeros((4,9))
+    H = np.zeros((7,9))
     H[:3,3:6] = -np.eye(3)
     H[3,8] = -1
+    H[4:,:3] = skew(b[10:13])
     # H = np.zeros((6,9))
     # H[:3,3:6] = -np.eye(3)
     # H[3:,6:] = -np.eye(3)
@@ -145,7 +146,8 @@ def toy_example():
 def data_example():
     # b = np.array([0, 0, 0, 1, 0]).T  # second to last element needs to be 1 because of homogeneous tranformation formulation
     # b = np.array([0, 0, 0, 1, 1]).T  # experimenting to see about adding depth
-    b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1]).T  # experimental, for stacking dvl and depth measurements
+    # b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1]).T  # experimental, for stacking dvl and depth measurements
+    b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0.24494, -0.002385, -0.38615, 0, 0]).T  # experimental, for stacking dvl and depth measurements
 
     Q_omega = 0.1*np.eye(3)
     Q_a = 0.1*np.eye(3)
@@ -217,7 +219,8 @@ def data_example():
                 depth_position[2] = -depth_data.z[0,depth_ind]
                 # depth_position = -depth_data.z[0,depth_ind]
                 depth_ind += 1
-            depth_sensor_predicted = -np.matmul(filt.X[:3,:3].T, depth_position)
+            #depth_sensor_predicted = -np.matmul(filt.X[:3,:3].T, depth_position)
+            depth_position = -np.matmul(filt.X[:3,:3].T, depth_position)
 
             # Xp = filt.X[[0,1,2,4],:][:,[0,1,2,4]]
             # pi = np.array([0, 0.32, 0.17, 1]).T  # position of depth sensor in IMU coordinates, homogeneous
@@ -226,9 +229,11 @@ def data_example():
             # pw_prime = filt.X[:3,4] + w_delta_p
             # depth_sensor_predicted = -np.matmul( filt.X[:3,:3].T, pw_prime )  # rotate so vector is in robot frame
 
-            twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
+            #twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
 
-            measurement = np.hstack((floating_mean(dvl_data.z, dvl_ind, 7)-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1]))
+            #measurement = np.hstack((floating_mean(dvl_data.z, dvl_ind, 7)-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1]))
+            #measurement = np.hstack((floating_mean(dvl_data.z, dvl_ind, 7)-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1], mag_data.z[:,imu_ind], [0, 0]))
+            measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0], depth_position, [0, 1], mag_data.z[:,imu_ind], [0, 0]))
             filt.correction_stacked(measurement, b)
             dvl_ind += 1
 
