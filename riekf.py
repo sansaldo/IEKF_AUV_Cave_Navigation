@@ -107,10 +107,10 @@ class Right_IEKF:
         # Note that g is actually the measurement expected in global coordinate frame
         # RI-EKF correction Step
         # No need to stack measurments
-        X_stacked = block_diag(self.X, self.X)
+        X_stacked = block_diag(self.X, self.X, self.X)
         N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
         # N_stacked = block_diag(N[:3,:3],100*N[:3,:3])  # just want 6x6, turn up noise on second block because we base it on our current estimate
-        N_stacked = block_diag(N[:3,:3],100*N[2,2])  # just want 4x4 for *even more* stacking weirdness
+        N_stacked = block_diag(N[:3,:3],100*N[2,2],N[:3,:3])  # just want 4x4 for *even more* stacking weirdness
         # filter gain
         H = self.H(b)
         S = np.dot(np.dot(H, self.P), H.T) + N_stacked
@@ -121,7 +121,7 @@ class Right_IEKF:
         # want to eliminate "dead" rows of nu: with 0 index, these are rows 3,4,8,9 (rows 0,1,2 and 5,6,7 are active)
         # nu = nu[[0,1,2,5,6,7]]
         # OR if we literally *only* want depth we make the "hot" rows 0,1,2,7
-        nu = nu[[0,1,2,7]]
+        nu = nu[[0,1,2,7,10,11,12]]
         delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
         # skew define here to move to lie algebra 
 

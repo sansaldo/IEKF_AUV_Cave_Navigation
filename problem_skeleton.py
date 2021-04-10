@@ -96,7 +96,7 @@ def H_stacked(b):
     H = np.zeros((7,9))
     H[:3,3:6] = -np.eye(3)
     H[3,8] = -1
-    H[4:,3:6] = -np.eye(3)
+    H[4:,:3] = skew(b[10:13])
     # H = np.zeros((6,9))
     # H[:3,3:6] = -np.eye(3)
     # H[3:,6:] = -np.eye(3)
@@ -136,7 +136,7 @@ def toy_example():
 def data_example():
     # b = np.array([0, 0, 0, 1, 0]).T  # second to last element needs to be 1 because of homogeneous tranformation formulation
     # b = np.array([0, 0, 0, 1, 1]).T  # experimenting to see about adding depth
-    b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1, -0.00038348, -0.000000069, 0.000247606, 0, 0]).T  # experimental, for stacking dvl and depth measurements
+    b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0.24494, -0.002385, -0.38615, 0, 0]).T  # experimental, for stacking dvl and depth measurements
 
     Q_omega = 0.1*np.eye(3)
     Q_a = 0.1*np.eye(3)
