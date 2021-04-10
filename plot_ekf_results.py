@@ -70,6 +70,8 @@ def plot_2d(x, y, x_title, y_title, series_names, title, save_dir=None, state_ti
     plt.legend()
     plt.xlabel(x_title)
     plt.ylabel(y_title)
+    plt.xlim(-125, 25)
+    plt.ylim(-100, 50)
     plt.title(title)
     plt.grid()
 
@@ -124,6 +126,7 @@ def plot_3d(x, y, z, x_title, y_title, z_title, series_names, title, save_dir=No
     plt.xlabel(x_title)
     plt.ylabel(y_title)
     ax.set_zlabel(z_title)
+    ax.set_zlim()
     plt.title(title)
     plt.grid()
 
