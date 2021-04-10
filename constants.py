@@ -13,9 +13,9 @@ cone_times = np.array([[cone_times_flat[0], cone_times_flat[1], cone_times_flat[
                        [cone_times_flat[11], cone_times_flat[8], cone_times_flat[7], cone_times_flat[6], cone_times_flat[5], cone_times_flat[10]]]).T
 
 # -1 means we don't have that distance
-cone_distances = [[0.0, 19., -1.0, -1.0, -1.0, 30.],
+cone_distances = np.array([[0.0, 19., -1.0, -1.0, -1.0, 30.],
                   [19., 0.0, 32., -1.0, -1.0, -1.0],
                   [-1.0, 32., 0.0, 16., -1.0, -1.0],
                   [-1.0, -1.0, 16., 0.0, -1.0, -1.0],
                   [-1.0, -1.0, -1.0, -1.0, 0.0, -1.0],
-                  [30., -1.0, -1.0, -1.0, -1.0, 0.0]]
+                  [30., -1.0, -1.0, -1.0, -1.0, 0.0]])
