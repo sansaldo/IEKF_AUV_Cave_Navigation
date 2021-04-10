@@ -4,6 +4,8 @@ from scipy.linalg import  expm, block_diag
 from riekf import Right_IEKF
 from plot_ekf_results import plot_time_series, plot_2d, plot_3d
 from localization_metrics import *
+import os
+import csv
 
 def skew(omega):
     # Assume phi is a 3x1 vector
@@ -245,36 +247,54 @@ def data_example():
     all_X_pred = np.array(all_X_pred)
     all_time_pred = np.array(all_time_pred)
     
-    all_times = [all_time_pred, all_time_gt]
+    # Compare results to slam solution
+    slam = []
+    with open(os.path.join('comparison_results', 'slam.csv')) as csvf:
+        reader = csv.reader(csvf)
+        for row in reader:
+            slam.append([float(s) for s in row])
+    slam = np.array(slam).T # Note their results are in DVL frame
+    slam_times = np.array(slam)[:, 0]
+    slam = slam[:, 1:]
+    slam[:, 1:] = -slam[:, 1:]
+
+    all_times = [all_time_pred, all_time_gt, slam_times]
 
     # print(all_X_gt[0, :])
 
     print(all_X_gt.shape)
     metrics_us = cone_metrics(all_X_pred, all_time_pred)
     metrics_gt = cone_metrics(all_X_gt[:, :3], all_time_gt)
+    metrics_slam = cone_metrics(slam, slam_times)
+
     print('Our Cone Pass Differences:\n')
     for cone in range(6):
-        print(cone, np.mean(metrics_us['%s_2pass_abs_error' % str(cone)]))
+        print(cone, metrics_us['%s_2pass_2norm' % str(cone)])
 
     print('\nVisual-Odometry Cone Pass Differences:\n')
     for cone in range(6):
-        print(cone, np.mean(metrics_gt['%s_2pass_abs_error' % str(cone)]))
+        print(cone, metrics_gt['%s_2pass_2norm' % str(cone)])
+
+    print('\nSLAM Cone Pass Differences:\n')
+    for cone in range(6):
+        print(cone, metrics_slam['%s_2pass_2norm' % str(cone)])
+
 
     # Plot 3D position graph to check results
-    plot_3d([all_X_pred[:, 0], all_X_gt[:, 0]], 
-            [all_X_pred[:, 1], all_X_gt[:, 1]], 
-            [all_X_pred[:, 2], all_X_gt[:, 2]],
+    plot_3d([all_X_pred[:, 0], all_X_gt[:, 0], slam[:, 0]], 
+            [all_X_pred[:, 1], all_X_gt[:, 1], slam[:, 1]], 
+            [all_X_pred[:, 2], all_X_gt[:, 2], slam[:, 2]],
             'orientation_x', 'orientation_y', 'orientation_z',
-            ['predicted', 'ground truth'],
-            'RI-EKF Iteration 0 Results',
+            ['predicted', 'odometry', 'slam'],
+            'RI-EKF Results',
             save_dir='../',
             state_times=all_times)
 
-    plot_2d([all_X_pred[:, 0], all_X_gt[:, 0]], 
-            [all_X_pred[:, 1], all_X_gt[:, 1]], 
+    plot_2d([all_X_pred[:, 0], all_X_gt[:, 0], slam[:, 0]], 
+            [all_X_pred[:, 1], all_X_gt[:, 1], slam[:, 1]],
             'orientation_x', 'orientation_y', 
-            ['predicted', 'ground truth'],
-            'RI-EKF Iteration',
+            ['predicted', 'ground truth', 'slam'],
+            'RI-EKF Results',
             save_dir='../',
             state_times=all_times)
 
