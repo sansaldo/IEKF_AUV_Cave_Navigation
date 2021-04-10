@@ -3,6 +3,7 @@ import numpy as np
 from scipy.linalg import  expm, block_diag
 from riekf import Right_IEKF
 from plot_ekf_results import plot_time_series, plot_2d, plot_3d
+from localization_metrics import *
 
 def skew(omega):
     # Assume phi is a 3x1 vector
@@ -247,6 +248,17 @@ def data_example():
     all_times = [all_time_pred, all_time_gt]
 
     # print(all_X_gt[0, :])
+
+    print(all_X_gt.shape)
+    metrics_us = cone_metrics(all_X_pred, all_time_pred)
+    metrics_gt = cone_metrics(all_X_gt[:, :3], all_time_gt)
+    print('Our Cone Pass Differences:\n')
+    for cone in range(6):
+        print(cone, np.mean(metrics_us['%s_2pass_abs_error' % str(cone)]))
+
+    print('\nVisual-Odometry Cone Pass Differences:\n')
+    for cone in range(6):
+        print(cone, np.mean(metrics_gt['%s_2pass_abs_error' % str(cone)]))
 
     # Plot 3D position graph to check results
     plot_3d([all_X_pred[:, 0], all_X_gt[:, 0]], 
