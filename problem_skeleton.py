@@ -180,7 +180,7 @@ def data_example():
     all_X_gt = odom_data.z.T
     b_g = imu_bias_data.z
 
-    filt.prediction(imu_data.z[:,0], 0.1, imu_bias_data.z[:,0])
+    filt.prediction(imu_data.z[:,0], 0.1)
 
     imu_ind = 1
     dvl_ind = 0
@@ -191,7 +191,9 @@ def data_example():
         if imu_data.time[0,imu_ind] < dvl_data.time[0,dvl_ind]:
             dt = imu_data.time[0,imu_ind] - imu_data.time[0,imu_ind-1]
             dt = dt * 1e-9
-            filt.prediction(imu_data.z[:,imu_ind], dt)  #, b_g[:,imu_ind])
+            dw = (b_g[:,imu_ind] - b_g[:,imu_ind-1])/dt
+            
+            filt.prediction(imu_data.z[:,imu_ind], dt, dw)
             imu_ind += 1
         else:
             # Note to self: add correction for depth sensor relative to IMU - this will need to include rotation, and might fix weirdness
