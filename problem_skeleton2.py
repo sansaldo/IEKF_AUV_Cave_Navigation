@@ -93,12 +93,12 @@ def H_matrix_dvl_depth(b):
     return H
 
 def H_stacked(b):
-    H = np.zeros((4,9))
-    H[:3,3:6] = -np.eye(3)
-    H[3,8] = -1
-    # H = np.zeros((6,9))
+    # H = np.zeros((4,9))
     # H[:3,3:6] = -np.eye(3)
-    # H[3:,6:] = -np.eye(3)
+    # H[3,8] = -1
+    H = np.zeros((6,9))
+    H[:3,3:6] = -np.eye(3)
+    H[3:,6:] = -np.eye(3)
     # H = np.zeros((10,9))
     # H[:3,3:6] = -np.eye(3)
     # H[3:6,6:] = -np.eye(3)
@@ -150,7 +150,7 @@ def data_example():
 
     X0 = np.eye(5)
     X0[:3,:3] = initial_pose.R
-    X0[:3,4] = initial_pose.p
+    X0[:3,4] = [odom_data.z.T[0,0], odom_data.z.T[0,1], odom_data.z.T[0,2]]
     sys = {
         'f': imu_dynamics,
         'A': A_matrix(),
@@ -161,8 +161,6 @@ def data_example():
         'N': N,
         'X': X0,
     }
-
-    cone_timestamps = [1372687222.817922, 1372687282.219970, 1372687385.219641, 1372687430.219218, 1372687570.418142, 1372687896.077008, 1372688246.475310, 1372688413.886930, 1372688477.887347, 1372688594.087488, 1372688650.085620, 1372689028.086277, 1372689150.885724]
 
     imu_to_dvl = np.array([0, 0.38, 0.07]).T
     d_skew = skew(imu_to_dvl)
@@ -184,7 +182,7 @@ def data_example():
     all_X_gt = odom_data.z.T
     b_g = imu_bias_data.z
 
-    filt.prediction(imu_data.z[:,0], 0.1, imu_bias_data.z[:,0])
+    #filt.prediction(imu_data.z[:,0], 0.1, imu_bias_data.z[:,0])
     # if imu_data.time[0,0] <= dvl_data.time[0,0]:
     #     measurement = np.hstack((dvl_data.z[:,0], [1, 0]))
     #     # twist_velocity = np.matmul( d_skew, (imu_data.z[:3,0]) )  # - imu_bias_data.z[:3,0])) )
@@ -194,6 +192,8 @@ def data_example():
     imu_ind = 1
     dvl_ind = 0
     depth_ind = 0
+    imu_floating_mean = imu_data.z[:,imu_ind]
+    dvl_floating_mean = dvl_data.z[:,dvl_ind]
     # for i in range(4, min(imu_data.l,dvl_data.l),4):
     while imu_ind < imu_data.l and dvl_ind < dvl_data.l and depth_ind < depth_data.l:
         # Calculate proper dt)
@@ -203,46 +203,56 @@ def data_example():
         if imu_data.time[0,imu_ind] < dvl_data.time[0,dvl_ind]:
             dt = imu_data.time[0,imu_ind] - imu_data.time[0,imu_ind-1]
             dt = dt * 1e-9
-            if imu_ind > 10:
-                imu_floating_mean = [0,0,0,0,0,0,0,0,0]
-                for i in range(10):
-                    imu_floating_mean += imu_data.z[:,(imu_ind-5+i)]
-                imu_floating_mean = imu_floating_mean/10
+            if imu_ind > 5:
+            	imu_floating_mean = [0,0,0,0,0,0,0,0,0]
+            	for i in range(5):
+            		imu_floating_mean += imu_data.z[:,(imu_ind-2+i)]
+            	imu_floating_mean = imu_floating_mean/5
             else:
-                imu_floating_mean = imu_data.z[:,imu_ind]
+            	imu_floating_mean = imu_data.z[:,imu_ind]
 
             filt.prediction(imu_floating_mean, dt)  #, b_g[:,imu_ind])
             imu_ind += 1
         else:
             # Note to self: add correction for depth sensor relative to IMU - this will need to include rotation, and might fix weirdness
-            depth_position = filt.X[:3,4]
-            # depth_position = 0
+            # depth_position = filt.X[:3,4]
+            depth_position = 0
             while depth_data.time[0,depth_ind] < dvl_data.time[0,dvl_ind]:
-                depth_position[2] = -depth_data.z[0,depth_ind]
-                # depth_position = -depth_data.z[0,depth_ind]
+                # depth_position[2] = -depth_data.z[0,depth_ind]
+                depth_position = -depth_data.z[0,depth_ind]
                 depth_ind += 1
-            # print(depth_position, filt.X[:3,4])
-            depth_position = -np.matmul(filt.X[:3,:3].T, depth_position)
+            # depth_position = -np.matmul(filt.X[:3,:3].T, depth_position)
 
             # depth_sensor_predicted = np.matmul(T_imu_depth, np.matmul(filt.X, T_depth_imu))
             # depth_sensor_predicted = np.matmul(T_imu_depth, np.matmul(filt.X[[0,1,2,4],:][:,[0,1,2,4]], T_depth_imu))
-            # print(depth_sensor_predicted, filt.X)
             # depth_sensor_predicted[2,3] = depth_position  # adjust z to expected
-            # depth_position = np.matmul(T_depth_imu, np.linalg.solve(depth_sensor_predicted, T_imu_depth))[:3,3]
-            if dvl_ind > 7:
-                dvl_floating_mean = [0,0,0]
-                for i in range(7):
-                    dvl_floating_mean += dvl_data.z[:,(dvl_ind-3+i)]
-                dvl_floating_mean = dvl_floating_mean/7
-            else:
-                dvl_floating_mean = dvl_data.z[:,dvl_ind]
 
-            measurement = np.hstack((dvl_floating_mean, [1, 0], depth_position, [0, 1]))
+            Xp = filt.X[[0,1,2,4],:][:,[0,1,2,4]]
+            pi = np.array([0, 0.32, 0.17, 1]).T  # position of depth sensor in IMU coordinates, homogeneous
+            pw = np.matmul(Xp, pi)  # position of depth sensor in world frame
+            w_delta_p = np.array([0, 0, depth_position - pw[2]]).T  # get delta between depth sensor predicted and measured, in world frame coordinates
+            pw_prime = filt.X[:3,4] + w_delta_p
+            # print(depth_position, pw, filt.X[:3,4], pw_prime)
+            depth_sensor_predicted = -np.matmul( filt.X[:3,:3].T, pw_prime )  # rotate so vector is in robot frame
+
+            # depth_position = np.matmul(T_depth_imu, np.linalg.solve(depth_sensor_predicted, T_imu_depth))[:3,3]
+
+            # measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0], depth_sensor_predicted[:3], [0, 1]))
+            twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
+
+            if dvl_ind > 7:
+            	dvl_floating_mean = [0,0,0]
+            	for i in range(7):
+            		dvl_floating_mean += dvl_data.z[:,(dvl_ind-3+i)]
+            	dvl_floating_mean = dvl_floating_mean/7
+            else:
+            	dvl_floating_mean = dvl_data.z[:,dvl_ind]
+            	
+            measurement = np.hstack((dvl_floating_mean-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1]))
             # measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0, 0, 0, depth_position, 0, 1]))
             filt.correction_stacked(measurement, b)
 
             # measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0]))
-            # twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
             # measurement = np.hstack(( (dvl_data.z[:,dvl_ind]-twist_velocity), [1,0] ))
             # filt.correction(measurement, b)
             dvl_ind += 1
@@ -267,9 +277,9 @@ def data_example():
             [all_X_pred[:, 1], all_X_gt[:, 1]], 
             'orientation_x', 'orientation_y', 
             ['predicted', 'ground truth'],
-            'RI-EKF Iteration',
-            save_dir='../'
-             )
+           'RI-EKF Iteration',
+           save_dir='../'
+           )
 
 
 if __name__ == "__main__":
