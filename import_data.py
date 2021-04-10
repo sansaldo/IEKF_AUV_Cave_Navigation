@@ -106,7 +106,7 @@ for i in range(len(imu)):
     # nanoseconds = t.to_nsec()
     imu_data.time[:,i] = [imu[i,0]]
     # 9x1 vector: angular velocity x, angular velocity y, angular velocity z, linear accel x, linear accel y, linear accel z, x, y, z)
-    imu_data.z[:,i] = [imu[i,16], imu[i,17], imu[i,18],imu[i,28], imu[i,29], imu[i,30], 0, 0, 0]
+    imu_data.z[:,i] = [imu[i,16], imu[i,17], imu[i,18]+.00021,imu[i,28], imu[i,29], imu[i,30], 0, 0, 0]
 
 for i in range(len(depth)):
 

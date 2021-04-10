@@ -104,6 +104,16 @@ def H_stacked(b):
     # H[3:6,6:] = -np.eye(3)
     return H
 
+def floating_mean(data, index, window):
+    if index > window:
+        floating_mean = np.zeros_like(data[:,index])
+        for i in range(window):
+            floating_mean += data[:,(index-window+1+i)]
+        floating_mean = floating_mean/window
+    else:
+        floating_mean = data[:,index]
+    return floating_mean
+
 def toy_example():
     dummy_input = np.zeros((9,1))  # input comes in form of 9x1 vector
     dummy_input[3] = 0.1  # 0.1 m/s^2 for linear acceleration in x
@@ -194,9 +204,8 @@ def data_example():
         if imu_data.time[0,imu_ind] < dvl_data.time[0,dvl_ind]:
             dt = imu_data.time[0,imu_ind] - imu_data.time[0,imu_ind-1]
             dt = dt * 1e-9
-            dw = (b_g[:,imu_ind] - b_g[:,imu_ind-1])/dt
             
-            filt.prediction(imu_data.z[:,imu_ind], dt, dw)
+            filt.prediction(floating_mean(imu_data.z, imu_ind, 10), dt)
             imu_ind += 1
 
             latest_time = imu_data.time[0,imu_ind] * 1e-9
@@ -219,7 +228,7 @@ def data_example():
 
             twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
 
-            measurement = np.hstack((dvl_data.z[:,dvl_ind]-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1]))
+            measurement = np.hstack((floating_mean(dvl_data.z, dvl_ind, 7)-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1]))
             filt.correction_stacked(measurement, b)
             dvl_ind += 1
 
