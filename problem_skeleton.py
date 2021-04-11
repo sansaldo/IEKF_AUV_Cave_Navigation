@@ -210,7 +210,7 @@ def data_example():
             dt = imu_data.time[0,imu_ind] - imu_data.time[0,imu_ind-1]
             dt = dt * 1e-9
             
-            filt.prediction(floating_mean(imu_data.z, imu_ind, 10), dt)
+            filt.prediction(floating_mean(imu_data.z, imu_ind, 15), dt)
             imu_ind += 1
 
             latest_time = imu_data.time[0,imu_ind] * 1e-9
@@ -232,11 +232,11 @@ def data_example():
             # pw_prime = filt.X[:3,4] + w_delta_p
             # depth_sensor_predicted = -np.matmul( filt.X[:3,:3].T, pw_prime )  # rotate so vector is in robot frame
 
-            #twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
+            twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
 
             #measurement = np.hstack((floating_mean(dvl_data.z, dvl_ind, 7)-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1]))
             #measurement = np.hstack((floating_mean(dvl_data.z, dvl_ind, 7)-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1], mag_data.z[:,imu_ind], [0, 0]))
-            measurement = np.hstack((dvl_data.z[:,dvl_ind], [1, 0], depth_position, [0, 1], mag_data.z[:,imu_ind], [0, 0]))
+            measurement = np.hstack((dvl_data.z[:,dvl_ind]-twist_velocity, [1, 0], depth_position, [0, 1], mag_data.z[:,imu_ind], [0, 0]))
             filt.correction_stacked(measurement, b)
             dvl_ind += 1
 

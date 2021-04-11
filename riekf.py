@@ -110,7 +110,7 @@ class Right_IEKF:
         X_stacked = block_diag(self.X, self.X, self.X)
         N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
         # N_stacked = block_diag(N[:3,:3],100*N[:3,:3])  # just want 6x6, turn up noise on second block because we base it on our current estimate
-        N_stacked = block_diag(N[:3,:3],100*N[2,2],N[:3,:3])  # just want 4x4 for *even more* stacking weirdness
+        N_stacked = block_diag(7*N[:3,:3],10000*N[2,2],10000*N[:3,:3])  # just want 4x4 for *even more* stacking weirdness
         # filter gain
         H = self.H(b)
         S = np.dot(np.dot(H, self.P), H.T) + N_stacked
