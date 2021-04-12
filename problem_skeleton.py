@@ -279,6 +279,12 @@ def data_example():
     for cone in range(6):
         print(cone, metrics_slam['%s_2pass_2norm' % str(cone)])
 
+    print('----')
+    print(metrics_us)
+    print('----')
+    print(metrics_gt)
+    print('----')
+    print(metrics_slam)
 
     # Plot 3D position graph to check results
     plot_3d([all_X_pred[:, 0], all_X_gt[:, 0], slam[:, 0]], 

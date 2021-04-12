@@ -90,14 +90,17 @@ def cone_metrics(pos, times, cone_offsets=None):
 
         # Calculate traveled distance between cones
         pred_dist = 0.0
-        for k in range(cone0_idx, cone1_idx):
-            pred_dist += np.linalg.norm(pos[k+1] - pos[k])
+        
+        sample_freq = 10
+        for k in range(cone0_idx, cone1_idx, sample_freq): # Sample every 10 points for smoother paths
+            pred_dist += np.linalg.norm(pos[min(k+sample_freq, len(pos)-1)] - pos[k])
 
         gt_cone_distance = cone_distances[(i,j)]
         error = pred_dist - gt_cone_distance
 
         # Add the error for this segment of the path
         return_metrics['%s_%s_dist_error' % (str(i), str(j))] = error
+        return_metrics['%s_%s_dist' % (str(i), str(j))] = pred_dist
 
     return return_metrics
         
