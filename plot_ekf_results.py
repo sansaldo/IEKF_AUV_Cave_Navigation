@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import os
-from constants import cone_times, cone_times_ordered
+from constants import cone_times, cone_times_ordered, cone_offsets, cone_offsets_ordered
 import numpy as np
 
 # Plot time-series curves to compare predicted values with ground truth over time (or compare different EKF approaches)
@@ -56,12 +56,12 @@ def plot_2d(x, y, x_title, y_title, series_names, title, save_dir=None, state_ti
                 cone_time1 = cone_times[i, 1]
 
                 # Get belief position on first pass
-                x0 = x[s][np.argmin(np.abs(state_times[s] - cone_time0))]
-                y0 = y[s][np.argmin(np.abs(state_times[s] - cone_time0))]
+                x0 = x[s][np.argmin(np.abs(state_times[s] - cone_time0))] + cone_offsets[0,i,0]
+                y0 = y[s][np.argmin(np.abs(state_times[s] - cone_time0))] + cone_offsets[0,i,1]
 
                 # And belief position on second pass
-                x1 = x[s][np.argmin(np.abs(state_times[s] - cone_time1))]
-                y1 = y[s][np.argmin(np.abs(state_times[s] - cone_time1))]
+                x1 = x[s][np.argmin(np.abs(state_times[s] - cone_time1))] + cone_offsets[1,i,0]
+                y1 = y[s][np.argmin(np.abs(state_times[s] - cone_time1))] + cone_offsets[1,i,1]
 
                 # plt.scatter([x0], [y0], c=[cone_colors[s]], marker='^')
                 plt.scatter([x0], [y0], c=[cone_colors[i]], marker='^')

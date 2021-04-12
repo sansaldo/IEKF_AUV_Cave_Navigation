@@ -1,7 +1,7 @@
 import numpy as np
 from sklearn.metrics import mean_squared_error
 from itertools import product
-from constants import cone_times, cone_times_ordered, cone_distances, cone_path
+from constants import cone_times, cone_times_ordered, cone_distances, cone_path, cone_offsets_ordered, cone_offsets
 
 # Calculates MSE of ground truth (gt) and predicted trajectories
 # gt and predicted should be shape (number of timesteps, number of dimensions),
@@ -42,7 +42,7 @@ def mse(gt, predicted, gt_times=None, predicted_times=None):
 # times: array of shape (number of pred timesteps) for the evaluated estimation
 # cone_offsets: (optional) array of shape (number of cones, 2, 3) containing the xyz offset for each cone based on first and second camera observation
 # Returns a dictionary of metrics
-def cone_metrics(pos, times, cone_offsets=None):
+def cone_metrics(pos, times):
     return_metrics = {}
     no_cones = cone_times.shape[0]
     for i in range(no_cones):
@@ -52,15 +52,14 @@ def cone_metrics(pos, times, cone_offsets=None):
         pred_xyz0 = pos[np.argmin(np.abs(times - cone_time0)), :]
         pred_xyz1 = pos[np.argmin(np.abs(times - cone_time1)), :]
 
-        if cone_offsets is not None:
-            pred_xyz0 += cone_offsets[i,0,:]
-            pred_xyz1 += cone_offsets[i,1,:]
+        # Add offsets from AUV to cone
+        pred_xyz0[:2] += cone_offsets[0,i,:]
+        pred_xyz1[:2] += cone_offsets[1,i,:]
 
         return_metrics['%s_2pass_abs_error' % str(i)] = np.abs(pred_xyz0 - pred_xyz1)
         return_metrics['%s_2pass_error^2' % str(i)] = (pred_xyz0 - pred_xyz1) ** 2
         return_metrics['%s_2pass_2norm' % str(i)] = np.linalg.norm(pred_xyz0 - pred_xyz1, ord=2)
 
-   
     for step, i in enumerate(cone_path[:-1]):
         j = cone_path[step+1]
 
@@ -72,11 +71,17 @@ def cone_metrics(pos, times, cone_offsets=None):
         cone0_time = cone_times_ordered[step]
         cone0_idx = np.argmin(np.abs(times - cone0_time))
         pred0_xyz = pos[cone0_idx, :]
+        
+        # Add offset from AUV to cone
+        pred0_xyz[:2] += cone_offsets_ordered[:,i]
 
         # Terminal cone time and position
         cone1_time = cone_times_ordered[step + 1]
         cone1_idx = np.argmin(np.abs(times - cone1_time))
         pred1_xyz = pos[cone1_idx, :]
+        
+        # Add offset from AUV to cone
+        pred1_xyz[:2] += cone_offsets_ordered[:,i]
 
         print('Cones',i,j)
         print(cone0_time, '->', cone1_time)
