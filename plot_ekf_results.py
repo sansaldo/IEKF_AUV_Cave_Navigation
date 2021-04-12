@@ -1,7 +1,7 @@
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import os
-from constants import cone_times, cone_times_flat
+from constants import cone_times, cone_times_ordered
 import numpy as np
 
 # Plot time-series curves to compare predicted values with ground truth over time (or compare different EKF approaches)
