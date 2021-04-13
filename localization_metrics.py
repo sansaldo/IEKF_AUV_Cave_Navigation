@@ -83,15 +83,13 @@ def cone_metrics(pos, times):
         # Add offset from AUV to cone
         pred1_xyz[:2] += cone_offsets_ordered[:,i]
 
-        print('Cones',i,j)
-        print(cone0_time, '->', cone1_time)
-        print(cone0_idx, '->', cone1_idx)
-        print(pred0_xyz.shape)
+        # print('Cones',i,j)
+        # print(cone0_time, '->', cone1_time)
+        # print(cone0_idx, '->', cone1_idx)
+        # print(pred0_xyz.shape)
 
         # Sanity check
         assert cone0_idx < cone1_idx
-
-        # NOTE: cone offsets not incorporated here (probably won't be)
 
         # Calculate traveled distance between cones
         pred_dist = 0.0
