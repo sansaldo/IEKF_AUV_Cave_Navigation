@@ -39,35 +39,24 @@ def imu_dynamics(state, inputs, dt):
     Rk = state[:3,:3]
     vk = state[:3,3]
     pk = state[:3,4]
-    # print(state)
     # Assume matrix form for inputs
     omega_k = inputs[:3,:3]   #3x3
     ak = inputs[:3,3]         #3x1
 
-    # add bias
-    # b_g = imu_bias_data.z.T[]
-    # omega_k_bias = omega_k - b_g 
-
     g = np.array([0, 0, -9.80665])  # may need to make negative
 
-    # Rk1 = np.matmul(Rk,gamma_0(omega_k*dt))
-    # vk1 = vk + np.matmul(np.matmul(Rk,gamma_1(omega_k*dt)),ak)*dt + g*dt
-    # pk1 = pk + vk*dt + np.matmul(np.matmul(Rk,gamma_2(omega_k*dt)),ak)*(dt**2) + 0.5*g*(dt**2)
     Rk1 = np.matmul(Rk,expm(omega_k*dt))
     vk1 = vk + np.dot(Rk,ak)*dt + g*dt  # vk + np.dot(np.matmul(Rk,np.eye(3)),ak)*dt + g*dt
-    pk1 = pk + vk*dt + np.dot(Rk*0.5,ak)*(dt**2) + 0.5*g*(dt**2)  # pk + vk*dt + np.dot(np.dot(Rk,0.5*np.eye(3)),ak)*(dt**2) + 0.5*g*(dt**2)
+    pk1 = pk + vk*dt + np.dot(Rk,0.5*ak)*(dt**2) + 0.5*g*(dt**2)  # pk + vk*dt + np.dot(np.dot(Rk,0.5*np.eye(3)),ak)*(dt**2) + 0.5*g*(dt**2)
 
     new_state = np.eye(5)
     new_state[:3,:3] = Rk1
     new_state[:3,3]  = vk1
     new_state[:3,4]  = pk1
-    # print(new_state)
     return new_state
 
 def A_matrix():
     A = np.zeros((9,9))
-    # A[3,1] = -9.80665
-    # A[4,0] = 9.80665
     g = np.array([0, 0, -9.80665])
     A[3:6,0:3] = skew(g)
     A[6:,3:6] = np.eye(3)
@@ -83,8 +72,6 @@ def H_matrix(b): # Possibly nonconstant, but not likely we believe
     where Xi_ak is the k acceleration component, corresponding to the k velocity
     component of the state, and likewise for Xi_vj to pj in the position.
     '''
-    # H = np.zeros((5,9))
-    # H[:3,3:6] = -np.eye(3)
     H = np.zeros((3,9))
     H[:,3:6] = -np.eye(3)
     return H
@@ -96,16 +83,11 @@ def H_matrix_dvl_depth(b):
     return H
 
 def H_stacked(b):
+    # Exploit the fact we want/have zero-rows to get a smaller matrix
     H = np.zeros((7,9))
     H[:3,3:6] = -np.eye(3)
     H[3,8] = -1
     H[4:,:3] = skew(b[10:13])
-    # H = np.zeros((6,9))
-    # H[:3,3:6] = -np.eye(3)
-    # H[3:,6:] = -np.eye(3)
-    # H = np.zeros((10,9))
-    # H[:3,3:6] = -np.eye(3)
-    # H[3:6,6:] = -np.eye(3)
     return H
 
 def floating_mean(data, index, window):
@@ -146,49 +128,46 @@ def toy_example():
     filt.correction(dummy_correction, b)
     print(filt.X)
 
-def data_example():
-    # b = np.array([0, 0, 0, 1, 0]).T  # second to last element needs to be 1 because of homogeneous tranformation formulation
-    # b = np.array([0, 0, 0, 1, 1]).T  # experimenting to see about adding depth
-    # b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1]).T  # experimental, for stacking dvl and depth measurements
-    b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0.24494, -0.002385, -0.38615, 0, 0]).T  # experimental, for stacking dvl and depth measurements
+def run_IEKF_caves():
 
     Q_omega = 0.1*np.eye(3)
     Q_a = 0.1*np.eye(3)
-    Q = block_diag(Q_omega, Q_a, np.matmul(Q_a.T,Q_a))
+    Q = block_diag(Q_omega, Q_a, np.matmul(Q_a.T,Q_a))  # Last block is velocity covariance, so will be noisier if acceleration is noisy
 
-    DVL_cov = 0.1*np.eye(3)
-    # N = block_diag(DVL_cov, np.eye(2))
     # needs to be 5x5 to match, check if diagonalization is correct here (according to se2, rest should be zero. 
     # However, when we do that in practice the correction step gives us a singular matrix?). 
     # Permutation of axes does not matter as long as we have a diagonal covariance.
-    N = block_diag(DVL_cov, np.zeros((2,2)))  
+    DVL_cov = 0.7*np.eye(3)
+    N_DVL = block_diag(DVL_cov, np.zeros((2,2)))  
+
+    D_cov = 1000*np.eye(3)
+    N_D = block_diag(D_cov, np.zeros((2,2)))
+
+    M_cov = 1000*np.eye(3)
+    N_M = block_diag(M_cov, np.zeros((2,2)))
 
     X0 = np.eye(5)
     X0[:3,:3] = initial_pose.R
     X0[:3,4] = initial_pose.p
+
+    b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0.24494, -0.002385, -0.38615, 0, 0]).T  # experimental, for stacking dvl and depth measurements
     sys = {
         'f': imu_dynamics,
         'A': A_matrix(),
         'H': H_stacked,
         'Q': Q,
-        'N': N,
+        'N_DVL': N_DVL,
+        'N_D': N_D,
+        'N_M': N_M,
         'X': X0,
     }
 
     imu_to_dvl = np.array([0, 0.38, 0.07]).T
     d_skew = skew(imu_to_dvl)
-    R_imu_dvl = np.array([[0, 1, 0],
-                          [1, 0, 0],
-                          [0, 0, -1]])
-    T_imu_depth = np.eye(4)
-    T_imu_depth[:3,3] = np.array([0, 0.32, 0.17]).T
-    T_depth_imu = np.eye(4)
-    T_depth_imu[:3,3] = -np.array([0, 0.32, 0.17]).T
 
     filt = Right_IEKF(sys)
     # dt is from 0, so just need first timestep
     dt1 = imu_data.time[0,0] * 1e-9
-    
 
     # Need to collect predictions over time and ground truth (gt)
     all_X_pred = []
@@ -215,27 +194,15 @@ def data_example():
 
             latest_time = imu_data.time[0,imu_ind] * 1e-9
         else:
-            # Note to self: add correction for depth sensor relative to IMU - this will need to include rotation, and might fix weirdness
+            # Synthesize robot frame "depth" measurement
             depth_position = filt.X[:3,4]
-            # depth_position = 0
             while depth_data.time[0,depth_ind] < dvl_data.time[0,dvl_ind]:
                 depth_position[2] = -depth_data.z[0,depth_ind]
-                # depth_position = -depth_data.z[0,depth_ind]
                 depth_ind += 1
-            #depth_sensor_predicted = -np.matmul(filt.X[:3,:3].T, depth_position)
             depth_position = -np.matmul(filt.X[:3,:3].T, depth_position)
 
-            # Xp = filt.X[[0,1,2,4],:][:,[0,1,2,4]]
-            # pi = np.array([0, 0.32, 0.17, 1]).T  # position of depth sensor in IMU coordinates, homogeneous
-            # pw = np.matmul(Xp, pi)  # position of depth sensor in world frame
-            # w_delta_p = np.array([0, 0, depth_position - pw[2]]).T  # get delta between depth sensor predicted and measured, in world frame coordinates
-            # pw_prime = filt.X[:3,4] + w_delta_p
-            # depth_sensor_predicted = -np.matmul( filt.X[:3,:3].T, pw_prime )  # rotate so vector is in robot frame
+            twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )
 
-            twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )  # - imu_bias_data.z[:3,imu_ind]) )
-
-            #measurement = np.hstack((floating_mean(dvl_data.z, dvl_ind, 7)-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1]))
-            #measurement = np.hstack((floating_mean(dvl_data.z, dvl_ind, 7)-twist_velocity, [1, 0], depth_sensor_predicted[:3], [0, 1], mag_data.z[:,imu_ind], [0, 0]))
             measurement = np.hstack((dvl_data.z[:,dvl_ind]-twist_velocity, [1, 0], depth_position, [0, 1], mag_data.z[:,imu_ind], [0, 0]))
             filt.correction_stacked(measurement, b)
             dvl_ind += 1
@@ -306,4 +273,4 @@ def data_example():
 
 
 if __name__ == "__main__":
-    data_example()
+    run_IEKF_caves()

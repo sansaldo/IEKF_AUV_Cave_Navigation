@@ -14,7 +14,12 @@ class Right_IEKF:
         self.H = system['H']  # measurement error matrix
         # Note that measurement error matrix is a constant for this problem, cuz gravity duhh
         self.Q = system['Q']  # input noise covariance
-        self.N = system['N']  # measurement noise covariance
+        if 'N' in system:
+            self.N = system['N']  # <- example, if using only one sensor/unstacked measurements
+        else:
+            self.N_DVL = system['N_DVL']
+            self.N_D = system['N_D']
+            self.N_M = system['N_M']
         self.X = system['X'] if 'X' in system else np.eye(5) # state vector
         self.P = system['P'] if 'P' in system else 0.1 * np.eye(9)  # state covariance
 
@@ -74,9 +79,7 @@ class Right_IEKF:
         self.X = self.f(self.X, u_lie, dt)
 
     def correction(self, Y, b):
-        # Note that g is actually the measurement expected in global coordinate frame
         # RI-EKF correction Step
-        # No need to stack measurments
         N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
 
         # test change in performance when truncating H, nu, and N
@@ -104,13 +107,12 @@ class Right_IEKF:
         self.P = np.dot(np.dot(temp, self.P), temp.T) + np.dot(np.dot(L, N), L.T)
 
     def correction_stacked(self, Y, b):
-        # Note that g is actually the measurement expected in global coordinate frame
-        # RI-EKF correction Step
-        # No need to stack measurments
+        # RI-EKF correction Step with stacked measurements
         X_stacked = block_diag(self.X, self.X, self.X)
-        N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
-        # N_stacked = block_diag(N[:3,:3],100*N[:3,:3])  # just want 6x6, turn up noise on second block because we base it on our current estimate
-        N_stacked = block_diag(7*N[:3,:3],10000*N[2,2],10000*N[:3,:3])  # just want 4x4 for *even more* stacking weirdness
+        N_DVL = np.dot(np.dot(self.X, self.N_DVL), self.X.T)  # Check how we use diagonals, if we need to, etc.
+        N_D = np.dot(np.dot(self.X, self.N_D), self.X.T)
+        N_M = np.dot(np.dot(self.X, self.N_M), self.X.T)
+        N_stacked = block_diag(N_DVL[:3,:3],N_D[2,2],N_M[:3,:3])  # just want significant rows from covariances, in block-diagonal form
         # filter gain
         H = self.H(b)
         S = np.dot(np.dot(H, self.P), H.T) + N_stacked
@@ -118,9 +120,7 @@ class Right_IEKF:
 
         # Update state
         nu = np.dot(X_stacked, Y) - b
-        # want to eliminate "dead" rows of nu: with 0 index, these are rows 3,4,8,9 (rows 0,1,2 and 5,6,7 are active)
-        # nu = nu[[0,1,2,5,6,7]]
-        # OR if we literally *only* want depth we make the "hot" rows 0,1,2,7
+        # Take only the rows we care about
         nu = nu[[0,1,2,7,10,11,12]]
         delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
         # skew define here to move to lie algebra 
