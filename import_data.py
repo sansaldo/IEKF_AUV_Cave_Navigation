@@ -101,12 +101,9 @@ class mag_data:
 
 ####### PROCESS DATA ####### 
 for i in range(len(imu)):
-    # t = rospy.Time.from_sec(imu[1,0])
-    # seconds = t.to_sec() #floating point
-    # nanoseconds = t.to_nsec()
     imu_data.time[:,i] = [imu[i,0]]
     # 9x1 vector: angular velocity x, angular velocity y, angular velocity z, linear accel x, linear accel y, linear accel z, x, y, z)
-    imu_data.z[:,i] = [imu[i,16], imu[i,17], imu[i,18],imu[i,28], imu[i,29], imu[i,30], 0, 0, 0]
+    imu_data.z[:,i] = [imu[i,16], imu[i,17], imu[i,18]+.00022,imu[i,28], imu[i,29], imu[i,30], 0, 0, 0]
 
 for i in range(len(depth)):
 
@@ -117,12 +114,11 @@ for i in range(len(dvl)):
     # World frame
     dvl_data.time[:,i] = [dvl[i,0]]
     # 3x1 vector: field.velocityEarth0	field.velocityEarth1	field.velocityEarth2
-    # dvl_data.z[:,i] = [dvl[i,27], dvl[i,28], dvl[i,29]]
     dvl_data.z[:,i] = [dvl[i,28], dvl[i,27], -dvl[i,29]]  # expected based on frames figure from paper
 
 T = np.eye(4)
+T[1,1] = -1
 T[2,2] = -1
-T[3,3] = -1
 T[0,3] = 0
 T[1,3] = 0.64
 T[2,3] = 0.09
@@ -172,24 +168,20 @@ def quaternion_rotation_matrix(Q):
 for i in range(len(gt)):
     # World frame
     odom_data.time[:,i] = [gt[i,0]]
-    # 7x1: position.x, position.y, position.z, orientation.x, orientation.y, orientation.z, orientation.w
-    # odom_data.z[:,i] = [ gt[i,3], gt[i,4], gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ]
-    # odom_data.z[:,i] = [ -gt[i,4], -gt[i,3], gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ] # black magic
-    odom_data.z[:,i] = [ gt[i,3], -gt[i,4], -gt[i,5], gt[i,6], gt[i,7], gt[i,8], gt[i,9] ] # expected based on frame figure from paper
-    # Q = [gt[i,9], gt[i,6], gt[i,7], gt[i,8]]
-    # R = quaternion_rotation_matrix(Q)
-    # Hc = np.eye(4)
-    # Hc[:3,:3] = R
-    # Hc[0,3] = gt[i,3]
-    # Hc[1,3] = gt[i,4]
-    # Hc[2,3] = gt[i,5]
-    # Hi = np.linalg.solve(T, np.matmul(Hc, T))
+    Q = [gt[i,9], gt[i,6], gt[i,7], gt[i,8]]
+    R = quaternion_rotation_matrix(Q)
+    Hc = np.eye(4)
+    Hc[:3,:3] = R
+    Hc[0,3] = gt[i,3]
+    Hc[1,3] = gt[i,4]
+    Hc[2,3] = gt[i,5]
+    Hi = np.linalg.solve(T, np.matmul(Hc, T))
 
-    # odom_data.z[:,i] = [ Hi[0,3], Hi[1,3], Hi[2,3], 0, 0, 0, 0]  # dummy zeros because I don't want to convert quaternions rn
+    odom_data.z[:,i] = [ Hi[0,3], Hi[1,3], Hi[2,3], 0, 0, 0, 0]  # dummy zeros because I don't want to convert quaternions rn
 
-# initial_pose.p[:] = 0
 qx,qy,qz,qw = imu[0,3:7]
 initial_pose.R = quaternion_rotation_matrix([qw, qx, qy, qz])
+initial_pose.p[2] = -depth_data.z[0,0]
 
 for i in range(len(imu_bias)):
 
