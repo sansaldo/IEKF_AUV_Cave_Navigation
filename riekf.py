@@ -106,12 +106,14 @@ class Right_IEKF:
         self.P = np.dot(np.dot(temp, self.P), temp.T) + np.dot(np.dot(L, N), L.T)
 
     def correction_stacked(self, Y, b):
+
         # RI-EKF correction Step with stacked measurements
         X_stacked = block_diag(self.X, self.X, self.X)
         N_DVL = np.dot(np.dot(self.X, self.N_DVL), self.X.T)  # Check how we use diagonals, if we need to, etc.
         N_D = np.dot(np.dot(self.X, self.N_D), self.X.T)
         N_M = np.dot(np.dot(self.X, self.N_M), self.X.T)
         N_stacked = block_diag(N_DVL[:3,:3],N_D[2,2],N_M[:3,:3])  # just want significant rows from covariances, in block form
+
         # filter gain
         H = self.H(b)
         S = np.dot(np.dot(H, self.P), H.T) + N_stacked
@@ -119,7 +121,9 @@ class Right_IEKF:
 
         # Update state
         nu = np.dot(X_stacked, Y) - b
+
         # Take only the rows we care about
+
         nu = nu[[0,1,2,7,10,11,12]]
         delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
         # skew define here to move to lie algebra 

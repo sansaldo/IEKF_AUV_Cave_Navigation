@@ -106,8 +106,4 @@ def cone_metrics(pos, times):
         return_metrics['%s_%s_dist' % (str(i), str(j))] = pred_dist
 
     return return_metrics
-        
-
-
-    
-
+      
