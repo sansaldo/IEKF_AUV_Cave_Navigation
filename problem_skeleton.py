@@ -229,7 +229,6 @@ def run_IEKF_caves():
 
     # print(all_X_gt[0, :])
 
-    print(all_X_gt.shape)
     metrics_us = cone_metrics(all_X_pred, all_time_pred)
     metrics_gt = cone_metrics(all_X_gt[:, :3], all_time_gt)
     metrics_slam = cone_metrics(slam, slam_times)
