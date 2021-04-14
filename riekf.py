@@ -12,7 +12,7 @@ class Right_IEKF:
         self.A = system['A']  # error dynamics matrix
         self.f = system['f']  # process model
         self.H = system['H']  # measurement error matrix
-        # Note that measurement error matrix is a constant for this problem, cuz gravity duhh
+        # Note that measurement error matrix is a constant for this problem (gravity)
         self.Q = system['Q']  # input noise covariance
         if 'N' in system:
             self.N = system['N']  # <- example, if using only one sensor/unstacked measurements
@@ -71,10 +71,9 @@ class Right_IEKF:
         """
         u[0:3] = u[0:3] - b_g
         u_lie = self.skew(u)
-        Phi = expm(self.A*dt)  # see iekf slide 31, though in this case we may not have. Likely this is approximately I for sufficiently small dt. (still needs to be very small - like < 100 Hz)
-        # Phi = np.eye(self.A.shape[0])
+        Phi = expm(self.A*dt)  # see iekf slide 31, though in this case we may not have. Likely this is approximately I for sufficiently small dt. (still needs to be very small - like < 100 Hz) 
         Qd = np.matmul(np.matmul(Phi,self.Q),Phi.T)*dt  # discretized process noise, need to do Phi*Qd*Phi^T if Phi is not the identity
-        # self.P = np.dot(np.dot(self.A, self.P), self.A.T) + np.dot(np.dot(self.Ad(self.X), self.Q), self.Ad(self.X).T)
+
         self.P = np.dot(np.dot(Phi, self.P), Phi.T) + np.dot(np.dot(self.Ad(self.X), Qd), self.Ad(self.X).T)
         self.X = self.f(self.X, u_lie, dt)
 
@@ -112,7 +111,7 @@ class Right_IEKF:
         N_DVL = np.dot(np.dot(self.X, self.N_DVL), self.X.T)  # Check how we use diagonals, if we need to, etc.
         N_D = np.dot(np.dot(self.X, self.N_D), self.X.T)
         N_M = np.dot(np.dot(self.X, self.N_M), self.X.T)
-        N_stacked = block_diag(N_DVL[:3,:3],N_D[2,2],N_M[:3,:3])  # just want significant rows from covariances, in block-diagonal form
+        N_stacked = block_diag(N_DVL[:3,:3],N_D[2,2],N_M[:3,:3])  # just want significant rows from covariances, in block form
         # filter gain
         H = self.H(b)
         S = np.dot(np.dot(H, self.P), H.T) + N_stacked
