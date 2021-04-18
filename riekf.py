@@ -11,7 +11,11 @@ class Right_IEKF:
         #   system:     system and noise models
         self.A = system['A']  # error dynamics matrix
         self.f = system['f']  # process model
-        self.H = system['H']  # measurement error matrix
+        if 'H' in system:
+            self.H = system['H']  # measurement error matrix
+        else:
+            self.H_left = system['H_left']
+            self.H_right = system['H_right']
         # Note that measurement error matrix is a constant for this problem (gravity)
         self.Q = system['Q']  # input noise covariance
         if 'N' in system:
@@ -77,9 +81,12 @@ class Right_IEKF:
         self.P = np.dot(np.dot(Phi, self.P), Phi.T) + np.dot(np.dot(self.Ad(self.X), Qd), self.Ad(self.X).T)
         self.X = self.f(self.X, u_lie, dt)
 
-    def correction(self, Y, b):
+    def correction(self, Y, b, N=None):
         # RI-EKF correction Step
-        N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
+        if N is None:
+            N = np.dot(np.dot(self.X, self.N), self.X.T)  # Check how we use diagonals, if we need to, etc.
+        else:
+            N = np.dot(np.dot(self.X, N), self.X.T)
 
         # test change in performance when truncating H, nu, and N
         N = N[:3,:3]
@@ -104,6 +111,106 @@ class Right_IEKF:
         I = np.eye(np.shape(self.P)[0])
         temp = I - np.dot(L, H)
         self.P = np.dot(np.dot(temp, self.P), temp.T) + np.dot(np.dot(L, N), L.T)
+
+    def correction_dvl(self, Y, b):
+        # RI-EKF correction Step
+        N = np.dot(np.dot(self.X, self.N_DVL), self.X.T)  # Check how we use diagonals, if we need to, etc.
+
+        # test change in performance when truncating H, nu, and N
+        N = N[:3,:3]
+
+        # filter gain
+        H = self.H_right(b)
+        S = np.dot(np.dot(H, self.P), H.T) + N
+        L = np.dot(np.dot(self.P, H.T), np.linalg.inv(S))
+
+        # Update state
+        nu = np.dot(self.X, Y) - b
+
+        # test change in performance when truncating H, nu, and N
+        nu = nu[:3]  #0,1,2 are what we really care about
+
+        delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
+        # skew define here to move to lie algebra 
+
+        self.X = np.dot(expm(delta), self.X)
+
+        # Update Covariance
+        I = np.eye(np.shape(self.P)[0])
+        temp = I - np.dot(L, H)
+        self.P = np.dot(np.dot(temp, self.P), temp.T) + np.dot(np.dot(L, N), L.T)
+
+    def correction_mag(self, Y, b):
+        # RI-EKF correction Step
+        N = np.dot(np.dot(self.X, self.N_M), self.X.T)  # Check how we use diagonals, if we need to, etc.
+
+        # test change in performance when truncating H, nu, and N
+        N = N[:3,:3]
+
+        # filter gain
+        H = self.H_right(b)
+        S = np.dot(np.dot(H, self.P), H.T) + N
+        L = np.dot(np.dot(self.P, H.T), np.linalg.inv(S))
+
+        # Update state
+        nu = np.dot(self.X, Y) - b
+
+        # test change in performance when truncating H, nu, and N
+        nu = nu[:3]  #0,1,2 are what we really care about
+
+        delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
+        # skew define here to move to lie algebra 
+
+        self.X = np.dot(expm(delta), self.X)
+
+        # Update Covariance
+        I = np.eye(np.shape(self.P)[0])
+        temp = I - np.dot(L, H)
+        self.P = np.dot(np.dot(temp, self.P), temp.T) + np.dot(np.dot(L, N), L.T)
+
+    def correction_depth(self, Y, b):
+        R = self.X[:3,:3]
+        v = self.X[:3,3]
+        p = self.X[:3,4]
+
+        Xinv = np.eye(5)
+        Xinv[:3,:3] = R.T
+        Xinv[:3,3] = -np.dot(R.T,v)
+        Xinv[:3,4] = -np.dot(R.T,p)
+
+        # Switch covariance to left-invariant
+        AdXinv = self.Ad(Xinv)
+        P = np.matmul(AdXinv,np.matmul(self.P,AdXinv.T))
+
+        N = np.dot(np.dot(Xinv, self.N_D), Xinv.T)
+
+        # test change in performance when truncating H, nu, and N
+        N = N[2,2]
+
+        # filter gain
+        H = self.H_left(b)[2,:]  # only get the last row
+        S = np.dot(np.dot(H, P), H.T) + N
+        L = np.dot(np.dot(P, H.T), 1/S)  # S is one-dimensional in this case, so we're fine
+
+        # Update state
+        nu = np.dot(Xinv, Y) - b
+
+        # test change in performance when truncating H, nu, and N
+        nu = nu[2]  #2 are what we really care about
+
+        delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
+        # skew define here to move to lie algebra 
+
+        self.X = np.dot(self.X, expm(delta))
+
+        # Update Covariance
+        I = np.eye(np.shape(P)[0])
+        temp = I - np.dot(L, H)
+        P_new = np.dot(np.dot(temp, P), temp.T) + np.dot(np.dot(L, N), L.T)
+
+        # Switch covariance back to right-invariant
+        AdX = self.Ad(self.X)
+        self.P = np.matmul(AdX, np.matmul(P, AdX.T))
 
     def correction_stacked(self, Y, b):
 
