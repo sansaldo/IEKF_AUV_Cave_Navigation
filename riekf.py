@@ -25,7 +25,8 @@ class Right_IEKF:
             self.N_D = system['N_D']
             self.N_M = system['N_M']
         self.X = system['X'] if 'X' in system else np.eye(5) # state vector
-        self.P = system['P'] if 'P' in system else 0.1 * np.eye(9)  # state covariance
+        self.bias = np.zeros(6)
+        self.P = system['P'] if 'P' in system else 0.1 * np.eye(15)  # state covariance, need 6 more dimensions for gyro and accelerometer bias
 
     def Ad(self, X):
         # Adjoint of SO3 Adjoint (R) = R
@@ -73,12 +74,14 @@ class Right_IEKF:
         :param u: Note that u is actually the gyroscope reading
         :return:
         """
-        u[0:3] = u[0:3] - b_g
+        # print(self.bias)
+        u[0:6] = u[0:6] - self.bias
         u_lie = self.skew(u)
-        Phi = expm(self.A*dt)  # see iekf slide 31, though in this case we may not have. Likely this is approximately I for sufficiently small dt. (still needs to be very small - like < 100 Hz) 
+        Phi = expm(self.A(self.X)*dt)  # see iekf slide 31, though in this case we may not have. Likely this is approximately I for sufficiently small dt. (still needs to be very small - like < 100 Hz) 
         Qd = np.matmul(np.matmul(Phi,self.Q),Phi.T)*dt  # discretized process noise, need to do Phi*Qd*Phi^T if Phi is not the identity
 
-        self.P = np.dot(np.dot(Phi, self.P), Phi.T) + np.dot(np.dot(self.Ad(self.X), Qd), self.Ad(self.X).T)
+        AdX = block_diag(self.Ad(self.X), np.eye(6))
+        self.P = np.dot(np.dot(Phi, self.P), Phi.T) + np.dot(np.dot(AdX, Qd), AdX.T)
         self.X = self.f(self.X, u_lie, dt)
 
     def correction(self, Y, b, N=None):
@@ -123,6 +126,9 @@ class Right_IEKF:
         H = self.H_right(b)
         S = np.dot(np.dot(H, self.P), H.T) + N
         L = np.dot(np.dot(self.P, H.T), np.linalg.inv(S))
+        # separate L into state and bias rows
+        L_state = L[:9,:]
+        L_bias = L[9:15,:]
 
         # Update state
         nu = np.dot(self.X, Y) - b
@@ -130,10 +136,11 @@ class Right_IEKF:
         # test change in performance when truncating H, nu, and N
         nu = nu[:3]  #0,1,2 are what we really care about
 
-        delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
+        delta = self.skew(np.dot(L_state, nu))  # innovation in the spatial frame
         # skew define here to move to lie algebra 
 
         self.X = np.dot(expm(delta), self.X)
+        self.bias = self.bias + np.dot(L_bias,nu)
 
         # Update Covariance
         I = np.eye(np.shape(self.P)[0])
@@ -151,6 +158,9 @@ class Right_IEKF:
         H = self.H_right(b)
         S = np.dot(np.dot(H, self.P), H.T) + N
         L = np.dot(np.dot(self.P, H.T), np.linalg.inv(S))
+        # separate L into state and bias rows
+        L_state = L[:9,:]
+        L_bias = L[9:15,:]
 
         # Update state
         nu = np.dot(self.X, Y) - b
@@ -158,10 +168,11 @@ class Right_IEKF:
         # test change in performance when truncating H, nu, and N
         nu = nu[:3]  #0,1,2 are what we really care about
 
-        delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
+        delta = self.skew(np.dot(L_state, nu))  # innovation in the spatial frame
         # skew define here to move to lie algebra 
 
         self.X = np.dot(expm(delta), self.X)
+        self.bias = self.bias + np.dot(L_bias,nu)
 
         # Update Covariance
         I = np.eye(np.shape(self.P)[0])
@@ -179,29 +190,40 @@ class Right_IEKF:
         Xinv[:3,4] = -np.dot(R.T,p)
 
         # Switch covariance to left-invariant
-        AdXinv = self.Ad(Xinv)
+        AdXinv = block_diag(self.Ad(Xinv),np.eye(6))
         P = np.matmul(AdXinv,np.matmul(self.P,AdXinv.T))
 
         N = np.dot(np.dot(Xinv, self.N_D), Xinv.T)
 
         # test change in performance when truncating H, nu, and N
         N = N[2,2]
+        # N = N[:3,:3]
 
         # filter gain
         H = self.H_left(b)[2,:]  # only get the last row
+        # H = self.H_left(b)
         S = np.dot(np.dot(H, P), H.T) + N
         L = np.dot(np.dot(P, H.T), 1/S)  # S is one-dimensional in this case, so we're fine
+        # separate L into state and bias rows
+        L_state = L[:9]
+        L_bias = L[9:15]
+        # L = np.dot(np.dot(P, H.T), np.linalg.inv(S))  # S is one-dimensional in this case, so we're fine
+        # # separate L into state and bias rows
+        # L_state = L[:9,:]
+        # L_bias = L[9:15,:]
 
         # Update state
         nu = np.dot(Xinv, Y) - b
 
         # test change in performance when truncating H, nu, and N
         nu = nu[2]  #2 are what we really care about
+        # nu = nu[:3]
 
-        delta = self.skew(np.dot(L, nu))  # innovation in the spatial frame
+        delta = self.skew(np.dot(L_state, nu))  # innovation in the spatial frame
         # skew define here to move to lie algebra 
 
         self.X = np.dot(self.X, expm(delta))
+        self.bias = self.bias + np.dot(L_bias,nu)
 
         # Update Covariance
         I = np.eye(np.shape(P)[0])
@@ -209,7 +231,7 @@ class Right_IEKF:
         P_new = np.dot(np.dot(temp, P), temp.T) + np.dot(np.dot(L, N), L.T)
 
         # Switch covariance back to right-invariant
-        AdX = self.Ad(self.X)
+        AdX = block_diag(self.Ad(self.X),np.eye(6))
         self.P = np.matmul(AdX, np.matmul(P, AdX.T))
 
     def correction_stacked(self, Y, b):

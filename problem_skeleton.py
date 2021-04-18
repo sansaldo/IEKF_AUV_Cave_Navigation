@@ -62,6 +62,21 @@ def A_matrix():
     A[6:,3:6] = np.eye(3)
     return A
 
+def A_matrix_bias(X):
+    R = X[:3,:3]
+    v = X[:3,3]
+    p = X[:3,4]
+
+    A = np.zeros((15,15))
+    g = np.array([0, 0, -9.80665])
+    A[3:6,0:3] = skew(g)
+    A[6:9,3:6] = np.eye(3)
+    A[0:3,9:12] = -R
+    A[3:6,9:12] = -np.dot(skew(v),R)
+    A[6:9,9:12] = -np.dot(skew(p),R)
+    A[3:6,12:15] = -R
+    return A
+
 def H_matrix(b): # Possibly nonconstant, but not likely we believe
     '''
     H is 5x9 real matrix satisfying
@@ -91,17 +106,18 @@ def H_stacked(b):
     return H
 
 def H_right(b):
-    H = np.zeros((3,9))
+    # Magnetometer or DVL may depend on bias...?
+    H = np.zeros((3,15))
     H[:3,:3] = skew(b[:3])
     H[:3,3:6] = -b[3]*np.eye(3)
-    H[:3,6:] = -b[4]*np.eye(3)
+    H[:3,6:9] = -b[4]*np.eye(3)
     return H
 
 def H_left(b):
-    H = np.zeros((3,9))
+    H = np.zeros((3,15))
     H[:3,:3] = -skew(b[:3])
     H[:3,3:6] = b[3]*np.eye(3)
-    H[:3,6:] = b[4]*np.eye(3)
+    H[:3,6:9] = b[4]*np.eye(3)
     return H
 
 def floating_mean(data, index, window):
@@ -287,8 +303,9 @@ def run_IEKF_caves():
 def run_IEKF_sequential():
     Q_omega = 0.1*np.eye(3)
     Q_a = 0.1*np.eye(3)
-    Q_v = 0.1*np.eye(3)
-    Q = block_diag(Q_omega, Q_a, Q_v)  # Last block is velocity covariance, so will be noisier if acceleration is noisy
+    Q_v = 1*np.eye(3)
+    Q_bias = 0.01*np.eye(6)
+    Q = block_diag(Q_omega, Q_a, Q_v, Q_bias)  # Last block is velocity covariance, so will be noisier if acceleration is noisy
 
     # needs to be 5x5 to match, check if diagonalization is correct here (according to se2, rest should be zero. 
     # However, when we do that in practice the correction step gives us a singular matrix?). 
@@ -306,13 +323,12 @@ def run_IEKF_sequential():
     X0[:3,:3] = initial_pose.R
     X0[:3,4] = initial_pose.p
 
-    # b = np.array([0, 0, 0, 1, 0, 0, 0, 0, 0, 1, 0.24494, -0.002385, -0.38615, 0, 0]).T  # experimental, for stacking dvl and depth measurements
     b_dvl = np.array([0, 0, 0, 1, 0]).T
     b_d = np.array([0, 0, 0, 0, 1]).T
     b_mag = np.array([0.24494, -0.002385, -0.38615, 0, 0]).T
     sys = {
         'f': imu_dynamics,
-        'A': A_matrix(),
+        'A': A_matrix_bias,
         'H_left': H_left,
         'H_right': H_right,
         'N_DVL': N_DVL,
@@ -359,7 +375,7 @@ def run_IEKF_sequential():
             latest_time = imu_data.time[0,imu_ind] * 1e-9
 
         elif meas == 1:  # dvl
-            twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]) )
+            twist_velocity = np.matmul( d_skew, (imu_data.z[:3,imu_ind]-filt.bias[:3]) )
             Y = np.hstack((dvl_data.z[:,dvl_ind] - twist_velocity, [1,0]))
             filt.correction_dvl(Y, b_dvl)
             dvl_ind += 1
