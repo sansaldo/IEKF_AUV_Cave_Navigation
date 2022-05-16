@@ -3,7 +3,7 @@
 Introduction: This is a final research project for NA 568/EECS 568/ROB 530 MOBILE ROBOTICS: METHODS & ALGORITHMS WINTER 2021 at the University of Michigan. The goal of this project is to use Invariant Kalman filtering on data gathered from underwater cave systems for autonomous localization. This program uses the accelerator and gyroscope data for prediction, DVL, depth sensor and magnetometer for correction, and the 6 traffic cones for ground truth. 
 
 
-You can see our final presentation video of our program [here](https://www.youtube.com/watch?v=r809SdeicR8&t=4s)
+You can see our final presentation video of our program [here](https://www.youtube.com/watch?v=r809SdeicR8&t=4s), and a [report on our work](project_report.pdf) is included in this repo.
 
 ## Dataset
 
